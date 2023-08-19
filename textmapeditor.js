@@ -1,6 +1,7 @@
 const BACKGROUND = "rgb(32, 32, 32)";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 
+
 String.prototype.replaceAt = function (index, replacement) {
   return this.substring(0, index) + replacement + this.substring(index + replacement.length);
 }
@@ -17,9 +18,8 @@ class Point {
 
 
 
-function addPrefixSameLetter(letter, zone) {
-  return zone.split("\n").map((line) => letter + line).join("\n");
-}
+function addPrefixSameLetter(letter, zone) { return zone.split("\n").map((line) => letter + line).join("\n"); }
+function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) => line + letter).join("\n"); }
 
 class Text2D {
   constructor(char = " ") {
@@ -125,27 +125,56 @@ class TextMapEditor extends HTMLElement {
     canvas.width = 12080;
     canvas.height = 420;
 
-    this.style.overflowX = "scroll";
-    this.style.overflowY = "scroll";
-
+    this.style.overflow = "scroll";
 
     shadow.appendChild(canvas);
 
     this.text2d = new Text2D();
     this.clipBoard = "";
     class ActionBlit {
-      constructor(text2d, pos, previous, after) {
+      constructor(text2d, pos, before, after) {
         this.text2d = text2d;
-        this.pos = pos;
-        this.previous = previous;
+        this.pos = new Point(pos.x, pos.y);
+        this.before = before;
         this.after = after;
+        console.log("before: '" + before + "'")
+        console.log("after: '" + after + "'")
       }
-
       do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
-      undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.previous); }
+      undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
     }
 
-    this.cancelStack = new Array();
+    class CancelStack {
+      constructor() {
+        this.stack = new Array();
+        this.i = -1;
+      }
+
+      undo() {
+        if (this.i >= 0) {
+          this.stack[this.i].undo();
+          this.i--;
+        }
+      }
+
+      redo() {
+        if (this.stack.length > 0) {
+          if (this.i < this.stack.length - 1) {
+            this.i++;
+            this.stack[this.i].do();
+          }
+        }
+      }
+
+      push(a) {
+        this.stack = this.stack.slice(0, this.i+1);
+        this.stack.push(a);
+        a.do();
+        this.i++;
+      }
+    }
+
+    this.cancelStack = new CancelStack();
 
     const CELLW = 9;
     const CELLH = 16;
@@ -165,9 +194,13 @@ class TextMapEditor extends HTMLElement {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = SELECTIONBACKGROUND;
-      ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x), CELLH * Math.min(this.cursor.y, endSelection.y),
-        CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1), CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
+      ctx.beginPath();
+      ctx.roundRect(CELLW * Math.min(this.cursor.x, endSelection.x),
+        CELLH * Math.min(this.cursor.y, endSelection.y),
+        CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
+        CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1), 4);
 
+      ctx.fill();
       const R = this.getBoundingClientRect();
 
       for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
@@ -208,10 +241,7 @@ class TextMapEditor extends HTMLElement {
       endSelection = newEndSelection;
     }
 
-    const execute = (a) => {
-      this.cancelStack.push(a);
-      a.do();
-    }
+    const execute = (a) => { this.cancelStack.push(a); }
 
     const copySelection = () => {
       this.clipBoard = this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y);
@@ -252,9 +282,11 @@ class TextMapEditor extends HTMLElement {
     canvas.onkeydown = (evt) => {
       resizeCanvas();
       if (evt.ctrlKey) {
-        if (evt.key == "z" && this.cancelStack.length > 0) {
-          const a = this.cancelStack.pop();
-          a.undo();
+        if (evt.key == "z") {
+          this.cancelStack.undo();
+        }
+        if (evt.key == "y") {
+          this.cancelStack.redo();
         }
         if (evt.key == "x") {
           selectionValidate();
@@ -297,7 +329,7 @@ class TextMapEditor extends HTMLElement {
 
           const action = new ActionBlit(this.text2d, this.cursor,
             this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
-            this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, endSelection.y) + " ");
+            addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, endSelection.y), " "));
           execute(action);
 
         }
@@ -313,7 +345,6 @@ class TextMapEditor extends HTMLElement {
       }
       if (!evt.ctrlKey && evt.key.length == 1) {
         selectionValidate();
-
 
         let x = 0;
         for (let y = this.cursor.y; y <= endSelection.y; y++)
