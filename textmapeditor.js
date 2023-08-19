@@ -1,3 +1,6 @@
+const BACKGROUND = "rgb(32, 32, 32)";
+const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
+
 String.prototype.replaceAt = function (index, replacement) {
   return this.substring(0, index) + replacement + this.substring(index + replacement.length);
 }
@@ -10,6 +13,12 @@ class Point {
   up() { return new Point(this.x, Math.max(0, this.y - 1)); }
   right() { return new Point(this.x + 1, this.y); }
   down() { return new Point(this.x, this.y + 1); }
+}
+
+
+
+function addPrefixSameLetter(letter, zone) {
+  return zone.split("\n").map((line) => letter + line).join("\n");
 }
 
 class Text2D {
@@ -77,6 +86,16 @@ class Text2D {
   }
 
 
+
+  insertLine(y) {
+    y = y + 1;
+    this.lines = [
+      ...this.lines.slice(0, y),
+      "",
+      ...this.lines.slice(y)
+    ];
+  }
+
 }
 
 
@@ -113,7 +132,7 @@ class TextMapEditor extends HTMLElement {
     shadow.appendChild(canvas);
 
     this.text2d = new Text2D();
-
+    this.clipBoard = "";
     class ActionBlit {
       constructor(text2d, pos, previous, after) {
         this.text2d = text2d;
@@ -131,7 +150,7 @@ class TextMapEditor extends HTMLElement {
     const CELLW = 9;
     const CELLH = 16;
 
-    let cursor = new Point(0, 0);
+    this.cursor = new Point(0, 0);
     let cursorMouse = new Point(0, 0);
     let endSelection = new Point(0, 0);
 
@@ -142,19 +161,22 @@ class TextMapEditor extends HTMLElement {
 
     const update = () => {
       const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
-      ctx.fillStyle = "black";
+      ctx.fillStyle = BACKGROUND;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = "blue";
-      ctx.fillRect(CELLW * Math.min(cursor.x, endSelection.x), CELLH * Math.min(cursor.y, endSelection.y),
-        CELLW * (Math.abs(endSelection.x - cursor.x) + 1), CELLH * (Math.abs(endSelection.y - cursor.y) + 1));
+      ctx.fillStyle = SELECTIONBACKGROUND;
+      ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x), CELLH * Math.min(this.cursor.y, endSelection.y),
+        CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1), CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
 
       const R = this.getBoundingClientRect();
 
       for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
         for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
           const char = this.text2d.getCharAt(x, y);
-          ctx.fillStyle = isDigit(char) ? "pink" : "white";
+          ctx.fillStyle = "white";
+          if (isDigit(char)) ctx.fillStyle = "pink";
+          if (char == "(" || char == ")") ctx.fillStyle = "orange";
+
           ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
 
         }
@@ -166,7 +188,7 @@ class TextMapEditor extends HTMLElement {
 
 
     canvas.onmousedown = (evt) => {
-      cursor = cursorMouse;
+      this.cursor = cursorMouse;
       endSelection = cursorMouse;
       requestAnimationFrame(update);
     }
@@ -180,9 +202,9 @@ class TextMapEditor extends HTMLElement {
     }
 
     const selectionValidate = () => {
-      const newCursor = new Point(Math.min(cursor.x, endSelection.x), Math.min(cursor.y, endSelection.y));
-      const newEndSelection = new Point(Math.max(cursor.x, endSelection.x), Math.max(cursor.y, endSelection.y));
-      cursor = newCursor;
+      const newCursor = new Point(Math.min(this.cursor.x, endSelection.x), Math.min(this.cursor.y, endSelection.y));
+      const newEndSelection = new Point(Math.max(this.cursor.x, endSelection.x), Math.max(this.cursor.y, endSelection.y));
+      this.cursor = newCursor;
       endSelection = newEndSelection;
     }
 
@@ -192,20 +214,29 @@ class TextMapEditor extends HTMLElement {
     }
 
     const copySelection = () => {
-      this.clipBoard = this.text2d.extractZone(cursor.x, cursor.y, endSelection.x, endSelection.y);
+      this.clipBoard = this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y);
       navigator.clipboard.writeText(this.clipBoard);
     }
 
     const paste = (clipText) => {
+      console.log(clipText)
       selectionValidate();
-      const action = new ActionBlit(this.text2d, cursor,
-        this.text2d.extractZone(cursor.x, cursor.y, endSelection.x, endSelection.y), clipText);
+      const action = new ActionBlit(this.text2d, this.cursor,
+        this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), clipText);
+      execute(action);
+    }
+
+    const deleteSelection = () => {
+      selectionValidate();
+      const E = stringEmptyRectangle(endSelection.x - this.cursor.x + 1, endSelection.y - this.cursor.y + 1);
+      const action = new ActionBlit(this.text2d, this.cursor,
+        this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), E);
       execute(action);
     }
 
     const resizeCanvas = () => {
-      canvas.width = Math.max(canvas.width, CELLW * (cursor.x + 6));
-      canvas.height = Math.max(canvas.height, CELLH * (cursor.y + 6));
+      canvas.width = Math.max(canvas.width, CELLW * (this.cursor.x + 6));
+      canvas.height = Math.max(canvas.height, CELLH * (this.cursor.y + 6));
 
       canvas.width = Math.max(canvas.width, CELLW * (this.text2d.width + 4));
       canvas.height = Math.max(canvas.height, CELLH * (this.text2d.height + 4));
@@ -227,52 +258,73 @@ class TextMapEditor extends HTMLElement {
         }
         if (evt.key == "x") {
           selectionValidate();
-          const E = stringEmptyRectangle(endSelection.x - cursor.x, endSelection.y - cursor.y);
           copySelection();
-          const action = new ActionBlit(this.text2d, cursor, this.clipBoard, E);
-          execute(action);
+          deleteSelection();
         }
         if (evt.key == "c") {
           selectionValidate();
           copySelection();
         }
-        if (evt.key == "v")
-          paste(this.clipBoard);
+        if (evt.key == "v") {
+          navigator.clipboard.readText().then((t) => paste(t));
+          //paste(this.clipBoard);
+        }
+        if (evt.key == "a") {
+          this.cursor = new Point(0, 0);
+          endSelection = new Point(this.text2d.width, this.text2d.height);
+        }
+
+        if (evt.key == "l") {
+          this.cursor = new Point(0, this.cursor.y);
+          endSelection = new Point(this.text2d.width, this.cursor.y);
+          evt.preventDefault();
+        }
       }
-      if (evt.key == "ArrowLeft") { endSelection = endSelection.left(); if (!evt.shiftKey) cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowUp") { endSelection = endSelection.up(); if (!evt.shiftKey) cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowDown") { endSelection = endSelection.down(); if (!evt.shiftKey) cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowRight") { endSelection = endSelection.right(); if (!evt.shiftKey) cursor = endSelection; evt.preventDefault(); }
+      if (evt.key == "ArrowLeft") { endSelection = endSelection.left(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
+      if (evt.key == "ArrowUp") { endSelection = endSelection.up(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
+      if (evt.key == "ArrowDown") { endSelection = endSelection.down(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
+      if (evt.key == "ArrowRight") { endSelection = endSelection.right(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
       if (evt.key == "Backspace") {
-        cursor = cursor.left();
-        endSelection = cursor;
-        let x = this.text2d.lastCurrentWord(cursor.x, cursor.y);
-        const action = new ActionBlit(this.text2d, cursor,
-          this.text2d.extractZone(cursor.x, cursor.y, x + 1, cursor.y),
-          this.text2d.extractZone(cursor.x + 1, cursor.y, x, cursor.y) + " ");
-        execute(action);
+        if (this.cursor.x != endSelection.x) {
+          deleteSelection();
+        }
+        else {
+          this.cursor = this.cursor.left();
+          endSelection.x = this.cursor.x;
+          let x = 0;
+          for (let y = this.cursor.y; y <= endSelection.y; y++)
+            x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+
+          const action = new ActionBlit(this.text2d, this.cursor,
+            this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
+            this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, endSelection.y) + " ");
+          execute(action);
+
+        }
       }
       if (evt.key == "Delete") {
-        selectionValidate();
-        const E = stringEmptyRectangle(endSelection.x - cursor.x + 1, endSelection.y - cursor.y + 1);
-        const action = new ActionBlit(this.text2d, cursor,
-          this.text2d.extractZone(cursor.x, cursor.y, endSelection.x, endSelection.y), E);
-        execute(action);
+        deleteSelection();
       }
       if (evt.key == "Enter") {
-        cursor = cursor.down();
-        endSelection = cursor;
+        this.text2d.insertLine(this.cursor.y);
+        this.cursor = this.cursor.down();
+        endSelection = this.cursor;
 
       }
       if (!evt.ctrlKey && evt.key.length == 1) {
         selectionValidate();
 
-        let x = this.text2d.lastCurrentWord(cursor.x, cursor.y);
-        const action = new ActionBlit(this.text2d, cursor,
-          this.text2d.extractZone(cursor.x, cursor.y, x + 1, cursor.y), evt.key + this.text2d.extractZone(cursor.x, cursor.y, x, cursor.y));
+
+        let x = 0;
+        for (let y = this.cursor.y; y <= endSelection.y; y++)
+          x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+
+        const action = new ActionBlit(this.text2d, this.cursor,
+          this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
+          addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, endSelection.y)));
         execute(action);
-        cursor.x++;
-        endSelection = cursor;
+        this.cursor.x++;
+        endSelection = new Point(this.cursor.x, endSelection.y);
         evt.preventDefault();
       }
       update();

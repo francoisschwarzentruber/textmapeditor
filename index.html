@@ -7,7 +7,7 @@
     <style>
         text-map-editor {
             width: 100%;
-            height: 300px;
+            height: 320px;
             display: block;
         }
     </style>
@@ -24,15 +24,75 @@
             createCanvas(400, 400);
         }
 
-        
         function draw() {
-            try {
-                eval(editor.text)
+
+            function myEval(instruction) {
+                try {
+                    eval(instruction);
+                }
+                catch (e) {
+
+                }
+            }
+
+
+            function executePast(linePast) {
+                const A = linePast.split("|");
+                const lastToExecute = A[A.length - 1].split("  ");
+
+                for (const i of lastToExecute) {
+                    if (!(lastToExecute.indexOf("::") > 0)) {
+                        myEval(i);
+                    }
+                }
+            }
+            background("white");
+            const L = editor.lines;
+            const tGlobal = editor.cursor.x;
+            for (const line of L) {
+                if (line[tGlobal] != undefined && line[tGlobal] != " ") {
+
+                    let xB = tGlobal;
+                    while (xB > 0 && line[xB] != " " && line[xB] != undefined)
+                        xB--;
+                    if (line[xB] == " ") xB++;
+
+                    let xE = tGlobal;
+                    while (line[xE] != " " && line[xE] != undefined)
+                        xE++;
+
+                    const linePast = line.substr(0, xB);
+                    executePast(linePast);
+                    let instruction = line.substr(xB, xE - xB);
+                    instruction = instruction.replaceAll("_", " ");
+
+                    if (instruction.indexOf("::") > 0) {
+                        const A = instruction.replaceAll(":", " ");
+                        const tab = A.split(" ");
+                        const C = tab[0].split("=");
+                        const variable = C[0];
+                        const firstValue = eval(C[1]);
+                        const lastValue = eval(tab[tab.length - 1]);
+                        const alpha = (tGlobal - xB) / (xE - xB);
+
+                        const intermediateInstruction = variable + " = " + (firstValue * (1 - alpha) + lastValue * alpha);
+                        myEval(intermediateInstruction);
+
+
+
+                    }
+                    else {
+                        myEval(instruction)
+
+                    }
+
+                }
+                else
+                    executePast(line.substr(0, tGlobal));
 
             }
-            catch(e) {
-                
-            }
+
+
         }
     </script>
 </body>
