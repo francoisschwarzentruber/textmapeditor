@@ -12,6 +12,8 @@ This text editor is an HTML Web component dedicated for editing texts like ascii
 - Drag drop
 - Rectangular selection
 - Multiple cursors
+- Undo/redo
+- Cut/copy/paste
 
 ## Roadmap
 - Customizable (like having pictures etc. instead of text)
