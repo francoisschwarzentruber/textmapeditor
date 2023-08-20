@@ -1,16 +1,22 @@
+/**
+ * colors
+ * */
 const BACKGROUND = "rgb(32, 32, 32)";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 
 
-String.prototype.replaceAt = function (index, replacement) {
-  return this.substring(0, index) + replacement + this.substring(index + replacement.length);
+String.prototype.replaceAt = function (i, replacement) {
+  return this.substring(0, i) + replacement + this.substring(i + replacement.length);
 }
 
 function between(v, a, b) { return (a <= v && v <= b) || (b <= v && v <= a); }
 
+/**
+ * an immutable point in the plane with integers x and y as coordinates
+ */
 class Point {
   constructor(x, y) { this.x = x; this.y = y; }
-  left() { return new Point(Math.max(0, this.x - 1), this.y); }
+  left() { return new Point(Math.max(0, this.x - 1), this.y); } // returns a new point
   up() { return new Point(this.x, Math.max(0, this.y - 1)); }
   right() { return new Point(this.x + 1, this.y); }
   down() { return new Point(this.x, this.y + 1); }
@@ -21,18 +27,31 @@ class Point {
 function addPrefixSameLetter(letter, zone) { return zone.split("\n").map((line) => letter + line).join("\n"); }
 function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) => line + letter).join("\n"); }
 
+/**
+ * represents a multi-line text
+ */
 class Text2D {
-  constructor(char = " ") {
-    this.lines = new Array();
-    this.lines.push(char);
-  }
+  constructor(str = "") { this.lines = str.split("\n"); }
 
+  /**
+   * 
+   * @param {*} x 
+   * @param {*} y 
+   * @returns the character at line y column x
+   */
   getCharAt(x, y) {
     if (y >= this.lines.length || x >= this.lines[y].length)
       return " ";
     return this.lines[y][x];
   }
 
+  /**
+   * 
+   * @param {*} x 
+   * @param {*} y 
+   * @param {*} char 
+   * @description set the character at line y column x
+   */
   setCharAt(x, y, char) {
     if (y < this.lines.length) {
       if (x < this.lines[y].length)
@@ -50,15 +69,26 @@ class Text2D {
     }
   }
 
-
+  /**
+   * @return the x that ends the word at (x,y)
+   */
   lastCurrentWord(x, y) {
     while (this.extractZone(x, y, x + 2, y).trim() != "")
       x++;
     return x;
   }
-  get height() { return this.lines.length; }
-  get width() { return Math.max(...this.lines.map(l => l.length)) }
 
+  get height() { return Math.max(20, this.lines.length); }
+  get width() { return Math.max(150, Math.max(...this.lines.map(l => l.length))) }
+
+  /**
+   * 
+   * @param {*} x1 
+   * @param {*} y1 
+   * @param {*} x2 
+   * @param {*} y2 
+   * @returns the string corresponding to the rectangle
+   */
   extractZone(x1, y1, x2, y2) {
     let A = "";
     for (let y = y1; y <= y2; y++) {
@@ -70,8 +100,16 @@ class Text2D {
     return A;
   }
 
-  blitText(xLeft, yTop, A) {
-    const lines = A.split("\n");
+
+  /**
+   * 
+   * @param {*} xLeft 
+   * @param {*} yTop 
+   * @param {*} str 
+   * @description put the string
+   */
+  blitText(xLeft, yTop, str) {
+    const lines = str.split("\n");
     for (let y = 0; y < lines.length; y++)
       for (let x = 0; x < lines[y].length; x++)
         this.setCharAt(x + xLeft, y + yTop, lines[y][x]);
@@ -85,8 +123,11 @@ class Text2D {
     return text;
   }
 
-
-
+  /**
+   * 
+   * @param {*} y
+   * @description insert a line at y 
+   */
   insertLine(y) {
     y = y + 1;
     this.lines = [
@@ -96,6 +137,16 @@ class Text2D {
     ];
   }
 
+
+  deleteLine(y) {
+    this.lines = [
+      ...this.lines.slice(0, y),
+      ...this.lines.slice(y + 1)
+    ];
+  }
+
+
+  isLineEmpty(y) { if (y >= this.lines.length) return true; else return this.lines[y].trim() == ""; }
 }
 
 
@@ -137,8 +188,8 @@ class TextMapEditor extends HTMLElement {
         this.pos = new Point(pos.x, pos.y);
         this.before = before;
         this.after = after;
-        console.log("before: '" + before + "'")
-        console.log("after: '" + after + "'")
+        /*  console.log("before: '" + before + "'")
+          console.log("after: '" + after + "'")*/
       }
       do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
       undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
@@ -167,7 +218,7 @@ class TextMapEditor extends HTMLElement {
       }
 
       push(a) {
-        this.stack = this.stack.slice(0, this.i+1);
+        this.stack = this.stack.slice(0, this.i + 1);
         this.stack.push(a);
         a.do();
         this.i++;
@@ -182,6 +233,9 @@ class TextMapEditor extends HTMLElement {
     this.cursor = new Point(0, 0);
     let cursorMouse = new Point(0, 0);
     let endSelection = new Point(0, 0);
+    let dAndDShift = undefined;
+    let dAndDTopLeft = undefined;
+
 
     const ctx = canvas.getContext("2d");
     ctx.textAlign = "center";
@@ -194,13 +248,11 @@ class TextMapEditor extends HTMLElement {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = SELECTIONBACKGROUND;
-      ctx.beginPath();
-      ctx.roundRect(CELLW * Math.min(this.cursor.x, endSelection.x),
+      ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x),
         CELLH * Math.min(this.cursor.y, endSelection.y),
         CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
-        CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1), 4);
+        CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
 
-      ctx.fill();
       const R = this.getBoundingClientRect();
 
       for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
@@ -211,28 +263,19 @@ class TextMapEditor extends HTMLElement {
           if (char == "(" || char == ")") ctx.fillStyle = "orange";
 
           ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
-
         }
+
+      if (dAndDTopLeft) {
+        ctx.strokeStyle = "white";
+        ctx.strokeRect(dAndDTopLeft.x * CELLW, dAndDTopLeft.y * CELLH,
+          CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
+          CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
+      }
     }
 
     update();
 
     this.onscroll = update;
-
-
-    canvas.onmousedown = (evt) => {
-      this.cursor = cursorMouse;
-      endSelection = cursorMouse;
-      requestAnimationFrame(update);
-    }
-
-    canvas.onmousemove = (evt) => {
-      cursorMouse = new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
-      if (evt.buttons) {
-        endSelection = cursorMouse;
-      }
-      requestAnimationFrame(update);
-    }
 
     const selectionValidate = () => {
       const newCursor = new Point(Math.min(this.cursor.x, endSelection.x), Math.min(this.cursor.y, endSelection.y));
@@ -243,13 +286,13 @@ class TextMapEditor extends HTMLElement {
 
     const execute = (a) => { this.cancelStack.push(a); }
 
+    const getSelectionZone = () => this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y);
     const copySelection = () => {
-      this.clipBoard = this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y);
+      this.clipBoard = getSelectionZone();
       navigator.clipboard.writeText(this.clipBoard);
     }
 
     const paste = (clipText) => {
-      console.log(clipText)
       selectionValidate();
       const action = new ActionBlit(this.text2d, this.cursor,
         this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), clipText);
@@ -274,9 +317,53 @@ class TextMapEditor extends HTMLElement {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "bold 14px Sans Serif";
-
     }
-    canvas.onmouseup = selectionValidate;
+
+    const evtToPoint = (evt) => new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
+
+    canvas.onmousedown = (evt) => {
+      const p = evtToPoint(evt);
+      selectionValidate;
+
+      if (between(p.x, this.cursor.x, endSelection.x) && between(p.y, this.cursor.y, endSelection.y)
+        && (this.cursor.x != endSelection.x || this.cursor.y != endSelection.y)) {
+        dAndDShift = new Point(p.x - this.cursor.x, p.y - this.cursor.y);
+        dAndDTopLeft = this.cursor;
+      }
+      else {
+        this.cursor = cursorMouse;
+        endSelection = cursorMouse;
+      }
+      requestAnimationFrame(update);
+    }
+
+    canvas.onmousemove = (evt) => {
+      cursorMouse = evtToPoint(evt);
+      if (dAndDTopLeft) {
+        dAndDTopLeft = new Point(cursorMouse.x - dAndDShift.x, cursorMouse.y - dAndDShift.y);
+      }
+      else if (evt.buttons) {
+        endSelection = cursorMouse;
+      }
+      requestAnimationFrame(update);
+    }
+
+    canvas.onmouseup = (evt) => {
+      selectionValidate;
+      if (dAndDTopLeft) {
+        const A = getSelectionZone();
+        if (!evt.ctrlKey)
+          deleteSelection();
+        execute(new ActionBlit(this.text2d, dAndDTopLeft,
+          this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), A));
+        endSelection.x += dAndDTopLeft.x - this.cursor.x;
+        endSelection.y += dAndDTopLeft.y - this.cursor.y;
+        this.cursor = dAndDTopLeft;
+        dAndDTopLeft = undefined;
+        requestAnimationFrame(update);
+
+      }
+    }
 
     canvas.tabIndex = 1000;
     canvas.onkeydown = (evt) => {
@@ -307,8 +394,16 @@ class TextMapEditor extends HTMLElement {
         }
 
         if (evt.key == "l") {
+          selectionValidate();
           this.cursor = new Point(0, this.cursor.y);
-          endSelection = new Point(this.text2d.width, this.cursor.y);
+          endSelection = new Point(this.text2d.width, endSelection.y);
+          evt.preventDefault();
+        }
+
+        if (evt.key == "m") {
+          selectionValidate();
+          this.cursor = new Point(this.cursor.x, 0);
+          endSelection = new Point(endSelection.x, this.text2d.height);
           evt.preventDefault();
         }
       }
@@ -317,7 +412,19 @@ class TextMapEditor extends HTMLElement {
       if (evt.key == "ArrowDown") { endSelection = endSelection.down(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
       if (evt.key == "ArrowRight") { endSelection = endSelection.right(); if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
       if (evt.key == "Backspace") {
-        if (this.cursor.x != endSelection.x) {
+        selectionValidate();
+        const isSelectionLinesEmpty = () => {
+          for (let y = this.cursor.y; y <= endSelection.y; y++)
+            if (!this.text2d.isLineEmpty(y))
+              return false;
+          return true;
+        }
+
+        if (this.cursor.x == 0 && isSelectionLinesEmpty()) {
+          for (let y = this.cursor.y; y <= endSelection.y; y++)
+            this.text2d.deleteLine(y);
+        }
+        else if (this.cursor.x != endSelection.x) {
           deleteSelection();
         }
         else {
@@ -333,6 +440,9 @@ class TextMapEditor extends HTMLElement {
           execute(action);
 
         }
+      }
+      if (evt.key == "Escape") {
+        endSelection = this.cursor;
       }
       if (evt.key == "Delete") {
         deleteSelection();
