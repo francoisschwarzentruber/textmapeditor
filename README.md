@@ -6,7 +6,7 @@ This text editor is an HTML Web component dedicated for editing texts like ascii
 
 ## Features
 
-- HTML
+- HTML Web component
 - Less than 15kB
 - Implemented with canvas
 - Drag drop
