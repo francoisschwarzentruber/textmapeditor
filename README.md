@@ -2,7 +2,7 @@
 
 This text editor is an HTML Web component dedicated for editing texts like ascii-art. The selection is rectangular.
 
-![image](https://github.com/francoisschwarzentruber/textmapeditor/assets/43071857/a34daf5c-7d6f-4164-8dee-ac3f3065ff4d)
+![image](https://github.com/francoisschwarzentruber/textmapeditor/assets/43071857/dc4f0980-b20d-450f-9a4a-68b5fed6b4ee)
 
 ## Features
 
