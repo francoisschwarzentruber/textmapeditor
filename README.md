@@ -12,8 +12,11 @@ This text editor is an HTML Web component dedicated for editing texts like ascii
 - Drag drop
 - Rectangular selection
 - Multiple cursors
-- Undo/redo
-- Cut/copy/paste
+- Ctrl + Z, Y: Undo/redo
+- Ctrl + L: select line(s)
+- Ctrl + M: select column(s)
+- Ctrl + X, C, V: Cut/copy/paste
+- Retro-style editor
 
 ## Roadmap
 - Customizable (like having pictures etc. instead of text)
