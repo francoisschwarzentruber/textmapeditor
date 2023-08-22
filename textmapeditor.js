@@ -28,7 +28,7 @@ function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) 
  * represents a multi-line text
  */
 class Text2D {
-  constructor(str = "") { this.lines = str.split("\n"); }
+  constructor(str = "") { this.lines = str.split("\n").map((line) => [...line]); }
 
   /**
    * 
@@ -39,7 +39,7 @@ class Text2D {
   getCharAt(x, y) {
     if (y >= this.lines.length || x >= this.lines[y].length)
       return " ";
-    return this.lines[y].charAt(x);
+    return this.lines[y][x];
   }
 
   /**
@@ -52,15 +52,16 @@ class Text2D {
   setCharAt(x, y, char) {
     if (y < this.lines.length) {
       if (x < this.lines[y].length)
-        this.lines[y] = this.lines[y].replaceAt(x, char);
+        this.lines[y][x] = char;
       else {
-        this.lines[y] = this.lines[y] + " ".repeat(x - this.lines[y].length + 1);
-        this.setCharAt(x, y, char);
+        for (let x1 = this.lines[y].length; x1 <= x; x1++)
+          this.lines[y].push(" ");
+        this.lines[y][x] = char;
       }
     }
     else {
       for (let y2 = this.lines.length; y2 <= y; y2++) {
-        this.lines.push("");
+        this.lines.push([]);
       }
       this.setCharAt(x, y, char);
     }
@@ -107,21 +108,20 @@ class Text2D {
    */
   blitText(xLeft, yTop, str) {
     const lines = str.split("\n");
-    for (let y = 0; y < lines.length; y++)
-      for (let x = 0; x < lines[y].length; x++)
-        this.setCharAt(x + xLeft, y + yTop, lines[y][x]);
+    for (let y = 0; y < lines.length; y++) {
+      const line = [...lines[y]];
+      for (let x = 0; x < line.length; x++)
+        this.setCharAt(x + xLeft, y + yTop, line[x]);
+    }
   }
 
 
   get text() {
-    this.lines = this.lines.map((l) => l.trimEnd());
-    const text = this.lines.join("\n");
-    this.lines = text.split("\n");
-    return text;
+    const lines = this.lines.map((l) => l.join("").trimEnd());
+    return lines.join("\n");
   }
 
-
-  set text(txt) { this.lines = txt.split("\n"); }
+  set text(txt) { this.lines = txt.split("\n").map((line) => [...line]); }
 
   /**
    * 
@@ -267,7 +267,6 @@ class TextMapEditor extends HTMLElement {
       drawH(Math.max(this.cursor.y, endSelection.y) + 1);
       drawV(Math.min(this.cursor.x, endSelection.x));
       drawV(Math.max(this.cursor.x, endSelection.x) + 1);
-
     }
 
     update();
