@@ -2,8 +2,13 @@
  * colors
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
+const COLOR = "rgb(222, 222, 222)";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 
+/*const BACKGROUND = "white";
+const COLOR = "black";
+const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
+*/
 String.prototype.replaceAt = function (i, replacement) {
   return this.substring(0, i) + replacement + this.substring(i + replacement.length);
 }
@@ -128,11 +133,11 @@ class Text2D {
    * @param {*} y
    * @description insert a line at y 
    */
-  insertLine(y) { y = y + 1; this.lines = [...this.lines.slice(0, y), "", ...this.lines.slice(y)]; }
+  insertLine(y) { this.lines = [...this.lines.slice(0, y), [], ...this.lines.slice(y)]; }
 
   deleteLine(y) { this.lines = [...this.lines.slice(0, y), ...this.lines.slice(y + 1)]; }
 
-  isLineEmpty(y) { if (y >= this.lines.length) return true; else return this.lines[y].trim() == ""; }
+  isLineEmpty(y) { if (y >= this.lines.length) return true; else return this.lines[y].every((cell) => (cell == " ")); }
 }
 
 
@@ -197,8 +202,8 @@ class TextMapEditor extends HTMLElement {
 
     this.cancelStack = new CancelStack();
 
-    const CELLW = 9;
-    const CELLH = 16;
+    const CELLW = 10;
+    const CELLH = 20;
 
     this.cursor = new Point(0, 0);
     let cursorMouse = new Point(0, 0);
@@ -239,15 +244,18 @@ class TextMapEditor extends HTMLElement {
         for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
           const char = this.text2d.getCharAt(x, y);
           if (char != " ") {
-            ctx.fillStyle = "white";
+            ctx.fillStyle = COLOR;
             if (isDigit(char)) ctx.fillStyle = "pink";
             if (char == "(" || char == ")") ctx.fillStyle = "orange";
+            if (char == "[" || char == "]") ctx.fillStyle = "orange";
+            if (char == "," || char == "'") ctx.fillStyle = "rgb(128,128, 255)";
+
             ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
           }
         }
 
       if (dAndDTopLeft) {
-        ctx.strokeStyle = "white";
+        ctx.strokeStyle = COLOR;
         ctx.strokeRect(dAndDTopLeft.x * CELLW, dAndDTopLeft.y * CELLH,
           CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
           CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
