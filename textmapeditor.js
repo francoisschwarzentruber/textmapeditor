@@ -3,7 +3,7 @@
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(222, 222, 222)";
-const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
+const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
 
 /*const BACKGROUND = "white";
 const COLOR = "black";
@@ -429,7 +429,7 @@ class TextMapEditor extends HTMLElement {
       if (evt.key == "Delete")
         deleteSelection();
       if (evt.key == "Enter") {
-        this.text2d.insertLine(this.cursor.y);
+        this.text2d.insertLine((this.cursor.x == 0) ? this.cursor.y : this.cursor.y + 1);
         this.cursor = this.cursor.down();
         endSelection = this.cursor;
 
