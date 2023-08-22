@@ -42,7 +42,7 @@ class Text2D {
   getCharAt(x, y) {
     if (y >= this.lines.length || x >= this.lines[y].length)
       return " ";
-    return this.lines[y][x];
+    return this.lines[y].charAt(x);
   }
 
   /**
@@ -242,27 +242,44 @@ class TextMapEditor extends HTMLElement {
     ctx.textBaseline = "middle";
     ctx.font = "bold 14px Sans Serif";
 
+    let isCursorVisible = true;
+
+    const resizeCanvas = () => {
+      canvas.width = Math.max(canvas.width, CELLW * (this.cursor.x + 6));
+      canvas.height = Math.max(canvas.height, CELLH * (this.cursor.y + 6));
+
+      canvas.width = Math.max(canvas.width, CELLW * (this.text2d.width + 4));
+      canvas.height = Math.max(canvas.height, CELLH * (this.text2d.height + 4));
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 14px Monospace";
+    }
+
     const update = () => {
       const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
       ctx.fillStyle = BACKGROUND;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = SELECTIONBACKGROUND;
-      ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x),
-        CELLH * Math.min(this.cursor.y, endSelection.y),
-        CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
-        CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
+      if ((isCursorVisible || this.cursor.x != endSelection.x || this.cursor.y != endSelection.y)) {
+        ctx.fillStyle = SELECTIONBACKGROUND;
+        ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x),
+          CELLH * Math.min(this.cursor.y, endSelection.y),
+          CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
+          CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
+      }
 
       const R = this.getBoundingClientRect();
 
       for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
         for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
           const char = this.text2d.getCharAt(x, y);
-          ctx.fillStyle = "white";
-          if (isDigit(char)) ctx.fillStyle = "pink";
-          if (char == "(" || char == ")") ctx.fillStyle = "orange";
+          if (char != " ") {
+            ctx.fillStyle = "white";
+            if (isDigit(char)) ctx.fillStyle = "pink";
+            if (char == "(" || char == ")") ctx.fillStyle = "orange";
 
-          ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
+            ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
+          }
         }
 
       if (dAndDTopLeft) {
@@ -274,6 +291,7 @@ class TextMapEditor extends HTMLElement {
     }
 
     update();
+    setInterval(() => { isCursorVisible = !isCursorVisible; update() }, 500);
 
     this.onscroll = update;
 
@@ -294,8 +312,10 @@ class TextMapEditor extends HTMLElement {
 
     const paste = (clipText) => {
       selectionValidate();
+      const clipText2D = new Text2D(clipText);
       const action = new ActionBlit(this.text2d, this.cursor,
-        this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), clipText);
+        this.text2d.extractZone(this.cursor.x, this.cursor.y,
+          this.cursor.x + clipText2D.width, this.cursor.x + clipText2D.height), clipText);
       execute(action);
     }
 
@@ -307,17 +327,7 @@ class TextMapEditor extends HTMLElement {
       execute(action);
     }
 
-    const resizeCanvas = () => {
-      canvas.width = Math.max(canvas.width, CELLW * (this.cursor.x + 6));
-      canvas.height = Math.max(canvas.height, CELLH * (this.cursor.y + 6));
 
-      canvas.width = Math.max(canvas.width, CELLW * (this.text2d.width + 4));
-      canvas.height = Math.max(canvas.height, CELLH * (this.text2d.height + 4));
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "bold 14px Sans Serif";
-    }
 
     const evtToPoint = (evt) => new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
 
