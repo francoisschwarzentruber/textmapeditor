@@ -17,6 +17,7 @@ This text editor is an HTML Web component dedicated for editing texts like ascii
 - Ctrl + M: select column(s)
 - Ctrl + X, C, V: Cut/copy/paste
 - Retro-style editor
+- Cursor column/row guidelines
 
 ## Roadmap
 - Customizable (like having pictures etc. instead of text)
