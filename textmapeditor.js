@@ -313,7 +313,7 @@ class TextMapEditor extends HTMLElement {
     canvas.onmousedown = (evt) => {
       isCursorVisible = true;
       const p = evtToPoint(evt);
-      selectionValidate;
+      selectionValidate();
 
       if (between(p.x, this.cursor.x, endSelection.x) && between(p.y, this.cursor.y, endSelection.y)
         && (this.cursor.x != endSelection.x || this.cursor.y != endSelection.y)) {
