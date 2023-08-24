@@ -421,7 +421,6 @@ class TextMapEditor extends HTMLElement {
             this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
             addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, endSelection.y), " "));
           execute(action);
-
         }
       }
       if (evt.key == "Escape")
