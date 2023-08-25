@@ -33,7 +33,7 @@ function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) 
  * represents a multi-line text
  */
 class Text2D {
-  constructor(str = "") { this.lines = str.split("\n").map((line) => [...line]); }
+  constructor(str = "") { this.array = str.split("\n").map((line) => [...line]); }
 
   /**
    * 
@@ -42,9 +42,9 @@ class Text2D {
    * @returns the character at line y column x
    */
   getCharAt(x, y) {
-    if (y >= this.lines.length || x >= this.lines[y].length)
+    if (y >= this.array.length || x >= this.array[y].length)
       return " ";
-    return this.lines[y][x];
+    return this.array[y][x];
   }
 
   /**
@@ -55,18 +55,18 @@ class Text2D {
    * @description set the character at line y column x
    */
   setCharAt(x, y, char) {
-    if (y < this.lines.length) {
-      if (x < this.lines[y].length)
-        this.lines[y][x] = char;
+    if (y < this.array.length) {
+      if (x < this.array[y].length)
+        this.array[y][x] = char;
       else {
-        for (let x1 = this.lines[y].length; x1 <= x; x1++)
-          this.lines[y].push(" ");
-        this.lines[y][x] = char;
+        for (let x1 = this.array[y].length; x1 <= x; x1++)
+          this.array[y].push(" ");
+        this.array[y][x] = char;
       }
     }
     else {
-      for (let y2 = this.lines.length; y2 <= y; y2++) {
-        this.lines.push([]);
+      for (let y2 = this.array.length; y2 <= y; y2++) {
+        this.array.push([]);
       }
       this.setCharAt(x, y, char);
     }
@@ -81,8 +81,8 @@ class Text2D {
     return x;
   }
 
-  get height() { return Math.max(20, this.lines.length); }
-  get width() { return Math.max(150, Math.max(...this.lines.map(l => l.length))) }
+  get height() { return Math.max(20, this.array.length); }
+  get width() { return Math.max(150, Math.max(...this.array.map(l => l.length))) }
 
   /**
    * 
@@ -121,23 +121,21 @@ class Text2D {
   }
 
 
-  get text() {
-    const lines = this.lines.map((l) => l.join("").trimEnd());
-    return lines.join("\n");
-  }
+  get text() { return this.lines.join("\n"); }
+  set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
+  get lines() { return this.array.map((l) => l.join("").trimEnd()); }
 
-  set text(txt) { this.lines = txt.split("\n").map((line) => [...line]); }
 
   /**
    * 
    * @param {*} y
    * @description insert a line at y 
    */
-  insertLine(y) { this.lines = [...this.lines.slice(0, y), [], ...this.lines.slice(y)]; }
+  insertLine(y) { this.array = [...this.array.slice(0, y), [], ...this.array.slice(y)]; }
 
-  deleteLine(y) { this.lines = [...this.lines.slice(0, y), ...this.lines.slice(y + 1)]; }
+  deleteLine(y) { this.array = [...this.array.slice(0, y), ...this.array.slice(y + 1)]; }
 
-  isLineEmpty(y) { if (y >= this.lines.length) return true; else return this.lines[y].every((cell) => (cell == " ")); }
+  isLineEmpty(y) { if (y >= this.array.length) return true; else return this.array[y].every((cell) => (cell == " ")); }
 }
 
 
