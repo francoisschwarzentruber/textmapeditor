@@ -223,6 +223,7 @@ class TextMapEditor extends HTMLElement {
       ctx.font = "bold 14px Monospace";
     }
 
+
     const update = () => {
       const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
       ctx.fillStyle = BACKGROUND;
@@ -278,7 +279,7 @@ class TextMapEditor extends HTMLElement {
     }
 
     update();
-    setInterval(() => { isCursorVisible = !isCursorVisible; update() }, 500);
+    // setInterval(() => { isCursorVisible = !isCursorVisible; update() }, 500);
 
     this.onscroll = update;
 
@@ -454,11 +455,11 @@ class TextMapEditor extends HTMLElement {
 
   get lines() { return this.text2d.lines; }
   get text() { return this.text2d.text; }
-  set text(txt) { this.text2d.text = txt; update(); }
+  set text(txt) { this.text2d.text = txt; resizeCanvas(); update(); }
 
-  onchange = () => {};
+  onchange = () => { };
 
-  
+
 }
 
 customElements.define("text-map-editor", TextMapEditor);
