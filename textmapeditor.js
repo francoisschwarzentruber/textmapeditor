@@ -273,6 +273,8 @@ class TextMapEditor extends HTMLElement {
       drawH(Math.max(this.cursor.y, endSelection.y) + 1);
       drawV(Math.min(this.cursor.x, endSelection.x));
       drawV(Math.max(this.cursor.x, endSelection.x) + 1);
+
+      this.onchange();
     }
 
     update();
@@ -295,7 +297,7 @@ class TextMapEditor extends HTMLElement {
       navigator.clipboard.writeText(this.clipBoard);
     }
 
-    const paste = (clipText) => {
+    this.write = (clipText) => {
       selectionValidate();
       const clipText2D = new Text2D(clipText);
       const action = new ActionBlit(this.text2d, this.cursor,
@@ -357,7 +359,7 @@ class TextMapEditor extends HTMLElement {
     }
 
     canvas.tabIndex = 1000;
-    canvas.onkeydown = (evt) => {
+    this.onkeydown = (evt) => {
       resizeCanvas();
       if (evt.ctrlKey) {
         if (evt.key == "z") this.cancelStack.undo();
@@ -371,7 +373,7 @@ class TextMapEditor extends HTMLElement {
           selectionValidate();
           copySelection();
         }
-        if (evt.key == "v") navigator.clipboard.readText().then((t) => paste(t));
+        if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
         if (evt.key == "a") {
           this.cursor = new Point(0, 0);
           endSelection = new Point(this.text2d.width, this.text2d.height);
@@ -453,6 +455,10 @@ class TextMapEditor extends HTMLElement {
   get lines() { return this.text2d.lines; }
   get text() { return this.text2d.text; }
   set text(txt) { this.text2d.text = txt; update(); }
+
+  onchange = () => {};
+
+  
 }
 
 customElements.define("text-map-editor", TextMapEditor);
