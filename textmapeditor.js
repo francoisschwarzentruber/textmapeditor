@@ -5,6 +5,9 @@ const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(222, 222, 222)";
 const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
 
+const CELLW = 10;
+const CELLH = 20;
+
 /*const BACKGROUND = "white";
 const COLOR = "black";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
@@ -159,6 +162,7 @@ class TextMapEditor extends HTMLElement {
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
     const canvas = document.createElement("canvas");
+    this.canvas = canvas;
     canvas.width = 12080;
     canvas.height = 420;
 
@@ -200,99 +204,36 @@ class TextMapEditor extends HTMLElement {
 
     this.cancelStack = new CancelStack();
 
-    const CELLW = 10;
-    const CELLH = 20;
+
 
     this.cursor = new Point(0, 0);
     let cursorMouse = new Point(0, 0);
-    let endSelection = new Point(0, 0);
-    let dAndDShift = undefined;
-    let dAndDTopLeft = undefined;
+    this.endSelection = new Point(0, 0);
+    this.dAndDShift = undefined;
+    this.dAndDTopLeft = undefined;
 
     const ctx = canvas.getContext("2d");
 
-    let isCursorVisible = true;
-
-    const resizeCanvas = () => {
-      canvas.width = Math.max(canvas.width, CELLW * (this.cursor.x + 6));
-      canvas.height = Math.max(canvas.height, CELLH * (this.cursor.y + 6));
-      canvas.width = Math.max(canvas.width, CELLW * (this.text2d.width + 4));
-      canvas.height = Math.max(canvas.height, CELLH * (this.text2d.height + 4));
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "bold 14px Monospace";
-    }
+    // this.isCursorVisible = true;
 
 
-    const update = () => {
-      const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
-      ctx.fillStyle = BACKGROUND;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if ((isCursorVisible || this.cursor.x != endSelection.x || this.cursor.y != endSelection.y)) {
-        ctx.fillStyle = SELECTIONBACKGROUND;
-        ctx.fillRect(CELLW * Math.min(this.cursor.x, endSelection.x),
-          CELLH * Math.min(this.cursor.y, endSelection.y),
-          CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
-          CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
-      }
 
-      const R = this.getBoundingClientRect();
+    this.update();
+    // setInterval(() => { isCursorVisible = !isCursorVisible; this.update() }, 500);
 
-      for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
-        for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
-          const char = this.text2d.getCharAt(x, y);
-          if (char != " ") {
-            ctx.fillStyle = COLOR;
-            if (isDigit(char)) ctx.fillStyle = "pink";
-            if (char == "(" || char == ")") ctx.fillStyle = "orange";
-            if (char == "[" || char == "]") ctx.fillStyle = "orange";
-            if (char == "," || char == "'") ctx.fillStyle = "rgb(128,128, 255)";
-
-            ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
-          }
-        }
-
-      if (dAndDTopLeft) {
-        ctx.strokeStyle = COLOR;
-        ctx.strokeRect(dAndDTopLeft.x * CELLW, dAndDTopLeft.y * CELLH,
-          CELLW * (Math.abs(endSelection.x - this.cursor.x) + 1),
-          CELLH * (Math.abs(endSelection.y - this.cursor.y) + 1));
-      }
-
-      ctx.strokeStyle = "rgba(128, 128, 128, 0.2)";
-      const drawLine = (x1, y1, x2, y2) => {
-        ctx.beginPath();
-        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-        ctx.stroke();
-      }
-
-      const drawH = (y) => { drawLine(0, y * CELLH, canvas.width, y * CELLH); }
-      const drawV = (x) => { drawLine(x * CELLW, 0, x * CELLW, canvas.height); }
-
-      drawH(Math.min(this.cursor.y, endSelection.y));
-      drawH(Math.max(this.cursor.y, endSelection.y) + 1);
-      drawV(Math.min(this.cursor.x, endSelection.x));
-      drawV(Math.max(this.cursor.x, endSelection.x) + 1);
-
-      this.onchange();
-    }
-
-    update();
-    // setInterval(() => { isCursorVisible = !isCursorVisible; update() }, 500);
-
-    this.onscroll = update;
+    this.onscroll = this.update;
 
     const selectionValidate = () => {
-      const newCursor = new Point(Math.min(this.cursor.x, endSelection.x), Math.min(this.cursor.y, endSelection.y));
-      const newEndSelection = new Point(Math.max(this.cursor.x, endSelection.x), Math.max(this.cursor.y, endSelection.y));
+      const newCursor = new Point(Math.min(this.cursor.x, this.endSelection.x), Math.min(this.cursor.y, this.endSelection.y));
+      const newEndSelection = new Point(Math.max(this.cursor.x, this.endSelection.x), Math.max(this.cursor.y, this.endSelection.y));
       this.cursor = newCursor;
-      endSelection = newEndSelection;
+      this.endSelection = newEndSelection;
     }
 
     const execute = (a) => { this.cancelStack.push(a); }
 
-    const getSelectionZone = () => this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y);
+    const getSelectionZone = () => this.text2d.extractZone(this.cursor.x, this.cursor.y, this.endSelection.x, this.endSelection.y);
     const copySelection = () => {
       this.clipBoard = getSelectionZone();
       navigator.clipboard.writeText(this.clipBoard);
@@ -305,13 +246,14 @@ class TextMapEditor extends HTMLElement {
         this.text2d.extractZone(this.cursor.x, this.cursor.y,
           this.cursor.x + clipText2D.width, this.cursor.x + clipText2D.height), clipText);
       execute(action);
+      this.update();
     }
 
     const deleteSelection = () => {
       selectionValidate();
-      const E = stringEmptyRectangle(endSelection.x - this.cursor.x + 1, endSelection.y - this.cursor.y + 1);
+      const E = stringEmptyRectangle(this.endSelection.x - this.cursor.x + 1, this.endSelection.y - this.cursor.y + 1);
       const action = new ActionBlit(this.text2d, this.cursor,
-        this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), E);
+        this.text2d.extractZone(this.cursor.x, this.cursor.y, this.endSelection.x, this.endSelection.y), E);
       execute(action);
     }
 
@@ -320,48 +262,48 @@ class TextMapEditor extends HTMLElement {
     const evtToPoint = (evt) => new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
 
     canvas.onmousedown = (evt) => {
-      isCursorVisible = true;
+      this.isCursorVisible = true;
       const p = evtToPoint(evt);
       selectionValidate();
 
-      if (between(p.x, this.cursor.x, endSelection.x) && between(p.y, this.cursor.y, endSelection.y)
-        && (this.cursor.x != endSelection.x || this.cursor.y != endSelection.y)) {
-        dAndDShift = new Point(p.x - this.cursor.x, p.y - this.cursor.y);
-        dAndDTopLeft = this.cursor;
+      if (between(p.x, this.cursor.x, this.endSelection.x) && between(p.y, this.cursor.y, this.endSelection.y)
+        && (this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
+        this.dAndDShift = new Point(p.x - this.cursor.x, p.y - this.cursor.y);
+        this.dAndDTopLeft = this.cursor;
       }
       else {
         this.cursor = cursorMouse;
-        endSelection = cursorMouse;
+        this.endSelection = cursorMouse;
       }
-      requestAnimationFrame(update);
+      requestAnimationFrame(() => this.update());
     }
 
     canvas.onmousemove = (evt) => {
       cursorMouse = evtToPoint(evt);
-      if (dAndDTopLeft) dAndDTopLeft = new Point(cursorMouse.x - dAndDShift.x, cursorMouse.y - dAndDShift.y);
-      else if (evt.buttons) endSelection = cursorMouse;
+      if (this.dAndDTopLeft) this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
+      else if (evt.buttons) this.endSelection = cursorMouse;
 
-      requestAnimationFrame(update);
+      requestAnimationFrame(() => this.update());
     }
 
     canvas.onmouseup = (evt) => {
       selectionValidate;
-      if (dAndDTopLeft) {
+      if (this.dAndDTopLeft) {
         const A = getSelectionZone();
         if (!evt.ctrlKey) deleteSelection();
-        execute(new ActionBlit(this.text2d, dAndDTopLeft,
-          this.text2d.extractZone(this.cursor.x, this.cursor.y, endSelection.x, endSelection.y), A));
-        endSelection.x += dAndDTopLeft.x - this.cursor.x;
-        endSelection.y += dAndDTopLeft.y - this.cursor.y;
-        this.cursor = dAndDTopLeft;
-        dAndDTopLeft = undefined;
-        requestAnimationFrame(update);
+        execute(new ActionBlit(this.text2d, this.dAndDTopLeft,
+          this.text2d.extractZone(this.cursor.x, this.cursor.y, this.endSelection.x, this.endSelection.y), A));
+        this.endSelection.x += this.dAndDTopLeft.x - this.cursor.x;
+        this.endSelection.y += this.dAndDTopLeft.y - this.cursor.y;
+        this.cursor = this.dAndDTopLeft;
+        this.dAndDTopLeft = undefined;
+        requestAnimationFrame(() => this.update());
       }
     }
 
     canvas.tabIndex = 1000;
     this.onkeydown = (evt) => {
-      resizeCanvas();
+      this.resizeCanvas();
       if (evt.ctrlKey) {
         if (evt.key == "z") this.cancelStack.undo();
         else if (evt.key == "y") this.cancelStack.redo();
@@ -370,92 +312,163 @@ class TextMapEditor extends HTMLElement {
           copySelection();
           deleteSelection();
         }
-        if (evt.key == "c") {
+        else if (evt.key == "c") {
           selectionValidate();
           copySelection();
         }
-        if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
-        if (evt.key == "a") {
+        else if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
+        else if (evt.key == "a") {
           this.cursor = new Point(0, 0);
-          endSelection = new Point(this.text2d.width, this.text2d.height);
+          this.endSelection = new Point(this.text2d.width, this.text2d.height);
         }
-        if (evt.key == "l") {
+        else if (evt.key == "l") {
           selectionValidate();
           this.cursor = new Point(0, this.cursor.y);
-          endSelection = new Point(this.text2d.width, endSelection.y);
+          this.endSelection = new Point(this.text2d.width, this.endSelection.y);
           evt.preventDefault();
         }
-        if (evt.key == "m") {
+        else if (evt.key == "m") {
           selectionValidate();
           this.cursor = new Point(this.cursor.x, 0);
-          endSelection = new Point(endSelection.x, this.text2d.height);
+          this.endSelection = new Point(endSelection.x, this.text2d.height);
           evt.preventDefault();
         }
       }
-      if (evt.key == "ArrowLeft") { endSelection = endSelection.left(); isCursorVisible = true; if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowUp") { endSelection = endSelection.up(); isCursorVisible = true; if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowDown") { endSelection = endSelection.down(); isCursorVisible = true; if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "ArrowRight") { endSelection = endSelection.right(); isCursorVisible = true; if (!evt.shiftKey) this.cursor = endSelection; evt.preventDefault(); }
-      if (evt.key == "Backspace") {
+      else if (evt.key == "ArrowLeft") { this.endSelection = this.endSelection.left(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
+      else if (evt.key == "ArrowUp") { this.endSelection = this.endSelection.up(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
+      else if (evt.key == "ArrowDown") { this.endSelection = this.endSelection.down(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
+      else if (evt.key == "ArrowRight") { this.endSelection = this.endSelection.right(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
+      else if (evt.key == "Backspace") {
         selectionValidate();
         const isSelectionLinesEmpty = () => {
-          for (let y = this.cursor.y; y <= endSelection.y; y++)
+          for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             if (!this.text2d.isLineEmpty(y))
               return false;
           return true;
         }
 
         if (this.cursor.x == 0 && isSelectionLinesEmpty()) {
-          for (let y = this.cursor.y; y <= endSelection.y; y++)
+          for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             this.text2d.deleteLine(y);
         }
-        else if (this.cursor.x != endSelection.x)
+        else if (this.cursor.x != this.endSelection.x)
           deleteSelection();
         else {
           this.cursor = this.cursor.left();
-          endSelection.x = this.cursor.x;
+          this.endSelection.x = this.cursor.x;
           let x = 0;
-          for (let y = this.cursor.y; y <= endSelection.y; y++)
+          for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
 
           const action = new ActionBlit(this.text2d, this.cursor,
-            this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
-            addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, endSelection.y), " "));
+            this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, this.endSelection.y),
+            addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, this.endSelection.y), " "));
           execute(action);
         }
       }
-      if (evt.key == "Escape")
-        endSelection = this.cursor;
-      if (evt.key == "Delete")
+      else if (evt.key == "Escape")
+        this.endSelection = this.cursor;
+      else if (evt.key == "Delete")
         deleteSelection();
-      if (evt.key == "Enter") {
+      else if (evt.key == "Enter") {
         this.text2d.insertLine((this.cursor.x == 0) ? this.cursor.y : this.cursor.y + 1);
         this.cursor = this.cursor.down();
-        endSelection = this.cursor;
+        this.endSelection = this.cursor;
 
       }
-      if (!evt.ctrlKey && evt.key.length == 1) {
+      else if (evt.key.length == 1) {
         selectionValidate();
 
         let x = 0;
-        for (let y = this.cursor.y; y <= endSelection.y; y++)
+        for (let y = this.cursor.y; y <= this.endSelection.y; y++)
           x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
 
         const action = new ActionBlit(this.text2d, this.cursor,
-          this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, endSelection.y),
-          addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, endSelection.y)));
+          this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, this.endSelection.y),
+          addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, this.endSelection.y)));
         execute(action);
         this.cursor.x++;
-        endSelection = new Point(this.cursor.x, endSelection.y);
+        this.endSelection = new Point(this.cursor.x, this.endSelection.y);
         evt.preventDefault();
       }
-      update();
+      this.update();
     }
   }
 
+
+
+  resizeCanvas() {
+    const canvas = this.canvas;
+    const ctx = canvas.getContext("2d");
+    canvas.width = Math.max(canvas.width, CELLW * (this.cursor.x + 6));
+    canvas.height = Math.max(canvas.height, CELLH * (this.cursor.y + 6));
+    canvas.width = Math.max(canvas.width, CELLW * (this.text2d.width + 4));
+    canvas.height = Math.max(canvas.height, CELLH * (this.text2d.height + 4));
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "14px Monospace";
+  }
+
+  update() {
+    const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
+    const canvas = this.canvas;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = BACKGROUND;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if ((this.isCursorVisible || this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
+      ctx.fillStyle = SELECTIONBACKGROUND;
+      ctx.fillRect(CELLW * Math.min(this.cursor.x, this.endSelection.x),
+        CELLH * Math.min(this.cursor.y, this.endSelection.y),
+        CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1),
+        CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
+    }
+
+    const R = this.getBoundingClientRect();
+
+    for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
+      for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
+        const char = this.text2d.getCharAt(x, y);
+        if (char != " ") {
+          ctx.fillStyle = COLOR;
+          if (isDigit(char)) ctx.fillStyle = "pink";
+          if (char == "(" || char == ")") ctx.fillStyle = "orange";
+          if (char == "[" || char == "]") ctx.fillStyle = "orange";
+          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,128, 255)";
+
+          ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
+        }
+      }
+
+    if (this.dAndDTopLeft) {
+      ctx.strokeStyle = COLOR;
+      ctx.strokeRect(this.dAndDTopLeft.x * CELLW, this.dAndDTopLeft.y * CELLH,
+        CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1),
+        CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
+    }
+
+    ctx.strokeStyle = "rgba(128, 128, 128, 0.2)";
+    const drawLine = (x1, y1, x2, y2) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    const drawH = (y) => { drawLine(0, y * CELLH, canvas.width, y * CELLH); }
+    const drawV = (x) => { drawLine(x * CELLW, 0, x * CELLW, canvas.height); }
+
+    drawH(Math.min(this.cursor.y, this.endSelection.y));
+    drawH(Math.max(this.cursor.y, this.endSelection.y) + 1);
+    drawV(Math.min(this.cursor.x, this.endSelection.x));
+    drawV(Math.max(this.cursor.x, this.endSelection.x) + 1);
+
+    this.onchange();
+  }
+
+
   get lines() { return this.text2d.lines; }
   get text() { return this.text2d.text; }
-  set text(txt) { this.text2d.text = txt; resizeCanvas(); update(); }
+  set text(txt) { this.text2d.text = txt; this.resizeCanvas(); this.update(); }
 
   onchange = () => { };
 
