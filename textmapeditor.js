@@ -372,8 +372,10 @@ class TextMapEditor extends HTMLElement {
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             this.text2d.deleteLine(y);
         }
-        else if (this.cursor.x != this.endSelection.x)
+        else if (this.cursor.x != this.endSelection.x) {
           deleteSelection();
+          this.endSelection.x = this.cursor.x;
+        }
         else {
           this.cursor = this.cursor.left();
           this.endSelection.x = this.cursor.x;
