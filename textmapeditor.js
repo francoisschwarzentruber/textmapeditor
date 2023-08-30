@@ -214,13 +214,13 @@ class TextMapEditor extends HTMLElement {
 
     const ctx = canvas.getContext("2d");
 
-    // this.isCursorVisible = true;
+    this.isCursorVisible = true;
 
 
 
 
     this.update();
-    // setInterval(() => { isCursorVisible = !isCursorVisible; this.update() }, 500);
+     setInterval(() => { this.isCursorVisible = ! this.isCursorVisible; this.update() }, 500);
 
     this.onscroll = this.update;
 
