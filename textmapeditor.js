@@ -84,8 +84,8 @@ class Text2D {
     return x;
   }
 
-  get height() { return Math.max(20, this.array.length); }
-  get width() { return Math.max(150, Math.max(...this.array.map(l => l.length))) }
+  get height() { return Math.max(this.array.length); }
+  get width() { return Math.max(Math.max(...this.array.map(l => l.length))) }
 
   /**
    * 
@@ -246,6 +246,9 @@ class TextMapEditor extends HTMLElement {
         this.text2d.extractZone(this.cursor.x, this.cursor.y,
           this.cursor.x + clipText2D.width, this.cursor.x + clipText2D.height), clipText);
       execute(action);
+      this.cursor.x += clipText2D.width;
+      this.cursor.y += clipText2D.height - 1;
+      this.endSelection = this.cursor;
       this.update();
     }
 
@@ -287,7 +290,7 @@ class TextMapEditor extends HTMLElement {
     }
 
     canvas.onmouseup = (evt) => {
-      selectionValidate;
+      selectionValidate();
       if (this.dAndDTopLeft) {
         const A = getSelectionZone();
         if (!evt.ctrlKey) deleteSelection();
@@ -304,16 +307,17 @@ class TextMapEditor extends HTMLElement {
     canvas.tabIndex = 1000;
     this.onkeydown = (evt) => {
       this.resizeCanvas();
+
+      if (!evt.shiftKey)
+        selectionValidate();
       if (evt.ctrlKey) {
         if (evt.key == "z") this.cancelStack.undo();
         else if (evt.key == "y") this.cancelStack.redo();
         if (evt.key == "x") {
-          selectionValidate();
           copySelection();
           deleteSelection();
         }
         else if (evt.key == "c") {
-          selectionValidate();
           copySelection();
         }
         else if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
@@ -322,24 +326,41 @@ class TextMapEditor extends HTMLElement {
           this.endSelection = new Point(this.text2d.width, this.text2d.height);
         }
         else if (evt.key == "l") {
-          selectionValidate();
           this.cursor = new Point(0, this.cursor.y);
           this.endSelection = new Point(this.text2d.width, this.endSelection.y);
           evt.preventDefault();
         }
         else if (evt.key == "m") {
-          selectionValidate();
           this.cursor = new Point(this.cursor.x, 0);
           this.endSelection = new Point(endSelection.x, this.text2d.height);
           evt.preventDefault();
         }
       }
-      else if (evt.key == "ArrowLeft") { this.endSelection = this.endSelection.left(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
-      else if (evt.key == "ArrowUp") { this.endSelection = this.endSelection.up(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
+      else if (evt.key == "ArrowLeft") {
+        this.isCursorVisible = true;
+        if (evt.shiftKey) {
+          this.endSelection = this.endSelection.left();
+        }
+        else {
+          this.cursor = this.cursor.left();
+          this.endSelection = this.cursor;
+        }
+        evt.preventDefault();
+      }
+      else if (evt.key == "ArrowUp") {
+        this.isCursorVisible = true;
+        if (evt.shiftKey) {
+          this.endSelection = this.endSelection.up();
+        }
+        else {
+          this.cursor = this.cursor.up();
+          this.endSelection = this.cursor;
+        }
+        evt.preventDefault();
+      }
       else if (evt.key == "ArrowDown") { this.endSelection = this.endSelection.down(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
       else if (evt.key == "ArrowRight") { this.endSelection = this.endSelection.right(); this.isCursorVisible = true; if (!evt.shiftKey) this.cursor = this.endSelection; evt.preventDefault(); }
       else if (evt.key == "Backspace") {
-        selectionValidate();
         const isSelectionLinesEmpty = () => {
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             if (!this.text2d.isLineEmpty(y))
@@ -377,8 +398,6 @@ class TextMapEditor extends HTMLElement {
 
       }
       else if (evt.key.length == 1) {
-        selectionValidate();
-
         let x = 0;
         for (let y = this.cursor.y; y <= this.endSelection.y; y++)
           x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
