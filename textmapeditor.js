@@ -4,7 +4,6 @@
 const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(222, 222, 222)";
 const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
-
 const CELLW = 10;
 const CELLH = 20;
 
@@ -12,10 +11,6 @@ const CELLH = 20;
 const COLOR = "black";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 */
-String.prototype.replaceAt = function (i, replacement) {
-  return this.substring(0, i) + replacement + this.substring(i + replacement.length);
-}
-
 function between(v, a, b) { return (a <= v && v <= b) || (b <= v && v <= a); }
 
 /**
@@ -36,7 +31,7 @@ function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) 
  * represents a multi-line text
  */
 class Text2D {
-  constructor(str = "") { this.array = str.split("\n").map((line) => [...line]); }
+  constructor(str) { this.array = str.split("\n").map((line) => [...line]); }
 
   /**
    * 
@@ -79,8 +74,7 @@ class Text2D {
    * @return the x that ends the word at (x,y)
    */
   lastCurrentWord(x, y) {
-    while (this.extractZone(x, y, x + 2, y).trim() != "")
-      x++;
+    while (this.extractZone(x, y, x + 2, y).trim() != "") x++;
     return x;
   }
 
@@ -98,8 +92,7 @@ class Text2D {
   extractZone(x1, y1, x2, y2) {
     let A = "";
     for (let y = y1; y <= y2; y++) {
-      if (y > y1)
-        A = A + "\n";
+      if (y > y1) A = A + "\n";
       for (let x = x1; x <= x2; x++)
         A = A + this.getCharAt(x, y);
     }
@@ -135,13 +128,16 @@ class Text2D {
    * @description insert a line at y 
    */
   insertLine(y) { this.array = [...this.array.slice(0, y), [], ...this.array.slice(y)]; }
-
   deleteLine(y) { this.array = [...this.array.slice(0, y), ...this.array.slice(y + 1)]; }
-
   isLineEmpty(y) { if (y >= this.array.length) return true; else return this.array[y].every((cell) => (cell == " ")); }
 }
 
-
+/**
+ * 
+ * @param {*} w 
+ * @param {*} h 
+ * @returns a string of h lines made up of w spaces (" ")
+ */
 function stringEmptyRectangle(w, h) {
   const A = [];
   const s = " ".repeat(w);
@@ -156,6 +152,69 @@ const isDigit = (char) => {
   return 47 < code && code < 58;
 }
 
+
+
+class ActionBlit {
+  constructor(text2d, pos, after) {
+    this.text2d = text2d;
+    this.pos = new Point(pos.x, pos.y);
+    const afterText2d = new Text2D(after);
+    this.before = text2d.extractZone(pos.x, pos.y,
+      pos.x + afterText2d.width, pos.y + afterText2d.height);
+    this.after = after;
+  }
+  do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
+  undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
+}
+
+
+
+class ActionInsertLine {
+  constructor(text2d, y) {
+    this.text2d = text2d;
+    this.y = y;
+  }
+  do() { this.text2d.insertLine(this.y); }
+  undo() { this.text2d.deleteLine(this.y); }
+}
+
+
+
+class ActionDeleteLine {
+  constructor(text2d, y) {
+    this.text2d = text2d;
+    this.y = y;
+    this.previousLine = text2d.lines[y];
+  }
+  do() { this.text2d.deleteLine(this.y); }
+  undo() {
+    this.text2d.insertLine(this.y);
+    this.text2d.array[this.y] = this.previousLine.split("");
+  }
+}
+
+
+class CancelStack {
+  constructor() { this.stack = new Array(); this.i = -1; }
+
+  undo() { if (this.i >= 0) { this.stack[this.i].undo(); this.i--; } }
+
+  redo() {
+    if (this.stack.length > 0) {
+      if (this.i < this.stack.length - 1) { this.i++; this.stack[this.i].do(); }
+    }
+  }
+
+  push(a) {
+    this.stack = this.stack.slice(0, this.i + 1);
+    this.stack.push(a);
+    a.do();
+    this.i++;
+  }
+}
+
+
+
 class TextMapEditor extends HTMLElement {
   constructor() { super(); }
 
@@ -167,44 +226,12 @@ class TextMapEditor extends HTMLElement {
     canvas.height = 420;
 
     this.style.overflow = "scroll";
-
     shadow.appendChild(canvas);
 
-    this.text2d = new Text2D();
+    this.text2d = new Text2D("");
     this.clipBoard = "";
-    class ActionBlit {
-      constructor(text2d, pos, before, after) {
-        this.text2d = text2d;
-        this.pos = new Point(pos.x, pos.y);
-        this.before = before;
-        this.after = after;
-      }
-      do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
-      undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
-    }
-
-    class CancelStack {
-      constructor() { this.stack = new Array(); this.i = -1; }
-
-      undo() { if (this.i >= 0) { this.stack[this.i].undo(); this.i--; } }
-
-      redo() {
-        if (this.stack.length > 0) {
-          if (this.i < this.stack.length - 1) { this.i++; this.stack[this.i].do(); }
-        }
-      }
-
-      push(a) {
-        this.stack = this.stack.slice(0, this.i + 1);
-        this.stack.push(a);
-        a.do();
-        this.i++;
-      }
-    }
 
     this.cancelStack = new CancelStack();
-
-
 
     this.cursor = new Point(0, 0);
     let cursorMouse = new Point(0, 0);
@@ -216,11 +243,8 @@ class TextMapEditor extends HTMLElement {
 
     this.isCursorVisible = true;
 
-
-
-
     this.update();
-     setInterval(() => { this.isCursorVisible = ! this.isCursorVisible; this.update() }, 500);
+    setInterval(() => { this.isCursorVisible = !this.isCursorVisible; this.update() }, 500);
 
     this.onscroll = this.update;
 
@@ -242,9 +266,7 @@ class TextMapEditor extends HTMLElement {
     this.write = (clipText) => {
       selectionValidate();
       const clipText2D = new Text2D(clipText);
-      const action = new ActionBlit(this.text2d, this.cursor,
-        this.text2d.extractZone(this.cursor.x, this.cursor.y,
-          this.cursor.x + clipText2D.width, this.cursor.x + clipText2D.height), clipText);
+      const action = new ActionBlit(this.text2d, this.cursor, clipText);
       execute(action);
       this.cursor.x += clipText2D.width;
       this.cursor.y += clipText2D.height - 1;
@@ -255,8 +277,7 @@ class TextMapEditor extends HTMLElement {
     const deleteSelection = () => {
       selectionValidate();
       const E = stringEmptyRectangle(this.endSelection.x - this.cursor.x + 1, this.endSelection.y - this.cursor.y + 1);
-      const action = new ActionBlit(this.text2d, this.cursor,
-        this.text2d.extractZone(this.cursor.x, this.cursor.y, this.endSelection.x, this.endSelection.y), E);
+      const action = new ActionBlit(this.text2d, this.cursor, E);
       execute(action);
     }
 
@@ -294,8 +315,7 @@ class TextMapEditor extends HTMLElement {
       if (this.dAndDTopLeft) {
         const A = getSelectionZone();
         if (!evt.ctrlKey) deleteSelection();
-        execute(new ActionBlit(this.text2d, this.dAndDTopLeft,
-          this.text2d.extractZone(this.cursor.x, this.cursor.y, this.endSelection.x, this.endSelection.y), A));
+        execute(new ActionBlit(this.text2d, this.dAndDTopLeft, A));
         this.endSelection.x += this.dAndDTopLeft.x - this.cursor.x;
         this.endSelection.y += this.dAndDTopLeft.y - this.cursor.y;
         this.cursor = this.dAndDTopLeft;
@@ -317,9 +337,8 @@ class TextMapEditor extends HTMLElement {
           copySelection();
           deleteSelection();
         }
-        else if (evt.key == "c") {
+        else if (evt.key == "c")
           copySelection();
-        }
         else if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
         else if (evt.key == "a") {
           this.cursor = new Point(0, 0);
@@ -332,7 +351,7 @@ class TextMapEditor extends HTMLElement {
         }
         else if (evt.key == "m") {
           this.cursor = new Point(this.cursor.x, 0);
-          this.endSelection = new Point(endSelection.x, this.text2d.height);
+          this.endSelection = new Point(this.endSelection.x, this.text2d.height);
           evt.preventDefault();
         }
       }
@@ -369,8 +388,10 @@ class TextMapEditor extends HTMLElement {
         }
 
         if (this.cursor.x == 0 && isSelectionLinesEmpty()) {
-          for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-            this.text2d.deleteLine(y);
+          for (let y = this.cursor.y; y <= this.endSelection.y; y++) {
+            const action = new ActionDeleteLine(this.text2d, y);
+            execute(action);
+          }
         }
         else if (this.cursor.x != this.endSelection.x) {
           deleteSelection();
@@ -384,7 +405,6 @@ class TextMapEditor extends HTMLElement {
             x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
 
           const action = new ActionBlit(this.text2d, this.cursor,
-            this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, this.endSelection.y),
             addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, this.endSelection.y), " "));
           execute(action);
         }
@@ -394,7 +414,8 @@ class TextMapEditor extends HTMLElement {
       else if (evt.key == "Delete")
         deleteSelection();
       else if (evt.key == "Enter") {
-        this.text2d.insertLine((this.cursor.x == 0) ? this.cursor.y : this.cursor.y + 1);
+        const action = new ActionInsertLine(this.text2d, (this.cursor.x == 0) ? this.cursor.y : this.cursor.y + 1);
+        execute(action)
         this.cursor = this.cursor.down();
         this.endSelection = this.cursor;
 
@@ -405,7 +426,6 @@ class TextMapEditor extends HTMLElement {
           x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
 
         const action = new ActionBlit(this.text2d, this.cursor,
-          this.text2d.extractZone(this.cursor.x, this.cursor.y, x + 1, this.endSelection.y),
           addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, this.endSelection.y)));
         execute(action);
         this.cursor.x++;
@@ -486,14 +506,10 @@ class TextMapEditor extends HTMLElement {
     this.onchange();
   }
 
-
   get lines() { return this.text2d.lines; }
   get text() { return this.text2d.text; }
   set text(txt) { this.text2d.text = txt; this.resizeCanvas(); this.update(); }
-
   onchange = () => { };
-
-
 }
 
 customElements.define("text-map-editor", TextMapEditor);
