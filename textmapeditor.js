@@ -3,7 +3,7 @@
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(222, 222, 222)";
-const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
+const SELECTIONBACKGROUND = "rgba(96, 96, 192, 1)";
 const CELLW = 10;
 const CELLH = 20;
 
@@ -220,13 +220,32 @@ class TextMapEditor extends HTMLElement {
 
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
-    const canvas = document.createElement("canvas");
-    this.canvas = canvas;
-    canvas.width = 12080;
-    canvas.height = 420;
 
     this.style.overflow = "scroll";
-    shadow.appendChild(canvas);
+
+    this.wrapper = document.createElement("div");
+    this.wrapper.style.position = "relative";
+    this.wrapper.style.backgroundColor = BACKGROUND;
+    this.wrapper.style.width = "fit-content";
+    this.wrapper.style.height = "fit-content";
+
+
+
+    shadow.appendChild(this.wrapper);
+    this.divSelection = document.createElement("div");
+    this.divSelection.style.position = "absolute";
+    this.divSelection.style.backgroundColor = SELECTIONBACKGROUND;
+    this.divSelection.style.pointerEvents = "none";
+    this.divSelection.style.zIndex = -1;
+    this.wrapper.appendChild(this.divSelection);
+
+    const canvas = document.createElement("canvas");
+    this.canvas = canvas;
+
+    canvas.width = 12080;
+    canvas.height = 420;
+    canvas.style.backgroundColor = "rgba(0, 0, 0, 0)"
+    this.wrapper.appendChild(canvas);
 
     this.text2d = new Text2D("");
     this.clipBoard = "";
@@ -450,20 +469,29 @@ class TextMapEditor extends HTMLElement {
     ctx.font = "14px Monospace";
   }
 
+
+  updateSelection() {
+    this.divSelection.style.left = CELLW * Math.min(this.cursor.x, this.endSelection.x) + "px";
+    this.divSelection.style.top = CELLH * Math.min(this.cursor.y, this.endSelection.y) + "px";
+    this.divSelection.style.width = CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1) + "px";
+    this.divSelection.style.height = CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1) + "px";
+  }
+
+
   update() {
+    this.updateSelection();
     const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
     const canvas = this.canvas;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = BACKGROUND;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if ((this.isCursorVisible || this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
-      ctx.fillStyle = SELECTIONBACKGROUND;
-      ctx.fillRect(CELLW * Math.min(this.cursor.x, this.endSelection.x),
-        CELLH * Math.min(this.cursor.y, this.endSelection.y),
-        CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1),
-        CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
-    }
+    /*  if ((this.isCursorVisible || this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
+        ctx.fillStyle = SELECTIONBACKGROUND;
+        ctx.fillRect(CELLW * Math.min(this.cursor.x, this.endSelection.x),
+          CELLH * Math.min(this.cursor.y, this.endSelection.y),
+          CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1),
+          CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
+      }*/
 
     const R = this.getBoundingClientRect();
 
