@@ -228,7 +228,7 @@ class TextMapEditor extends HTMLElement {
     this.wrapper.style.backgroundColor = BACKGROUND;
     this.wrapper.style.width = "fit-content";
     this.wrapper.style.height = "fit-content";
-
+this.wrapper.style.overflow ="visible";
 
 
     shadow.appendChild(this.wrapper);
@@ -236,11 +236,14 @@ class TextMapEditor extends HTMLElement {
     this.divSelection.style.position = "absolute";
     this.divSelection.style.backgroundColor = SELECTIONBACKGROUND;
     this.divSelection.style.pointerEvents = "none";
-    this.divSelection.style.zIndex = -1;
+    this.divSelection.style.zIndex = 1;
+
     this.wrapper.appendChild(this.divSelection);
 
     const canvas = document.createElement("canvas");
     this.canvas = canvas;
+    this.canvas.style.zIndex = 2;
+    this.canvas.style.position = "absolute";
 
     canvas.width = 12080;
     canvas.height = 420;
@@ -484,7 +487,6 @@ class TextMapEditor extends HTMLElement {
     const canvas = this.canvas;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     /*  if ((this.isCursorVisible || this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
         ctx.fillStyle = SELECTIONBACKGROUND;
         ctx.fillRect(CELLW * Math.min(this.cursor.x, this.endSelection.x),
