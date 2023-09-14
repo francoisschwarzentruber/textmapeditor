@@ -119,7 +119,7 @@ class Text2D {
   set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
   get lines() { return this.array.map((l) => l.join("").trimEnd()); }
 
-  shiftRight(xLeft, y, n) {
+  shiftRight(xLeft, y, n, endY) {
     console.log(n)
     this._makeCellExists(xLeft, y);
     this.array[y] = [...this.array[y].slice(0, xLeft), ...Array(n).fill(" "), ...this.array[y].slice(xLeft)];
@@ -127,6 +127,18 @@ class Text2D {
   shiftLeft(xLeft, y, n) {
     this._makeCellExists(xLeft, y);
     this.array[y] = [...this.array[y].slice(0, xLeft), ...this.array[y].slice(xLeft + n)];
+  }
+
+
+  isFree(x, y, x2, y2 = y) {
+    for (let iy = y; iy <= y2; iy++) {
+      for (let ix = x; ix <= x2; ix++) {
+        this._makeCellExists(ix, iy);
+        if (this.array[iy][ix] != " ")
+          return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -177,36 +189,60 @@ class ActionBlit {
 }
 
 
+
+class ActionComposite {
+
+  constructor() {
+    this.actions = [];
+  }
+  addAction(a) { this.actions.push(a) }
+
+  do() { this.actions.map((a) => a.do()) }
+  undo() { const ar = [...this.actions].reverse(); ar.map((a) => a.undo()) }
+}
 /**
  * write the txt. It shift to the right if there are some text already there
  */
-class ActionWrite {
+class ActionWrite extends ActionComposite {
   constructor(text2d, pos, txt) {
+    super();
     this.text2d = text2d;
     this.pos = new Point(pos.x, pos.y);
-    this.isShiftX = [];
+
     const afterText2d = new Text2D(txt);
     this.afterText2d = afterText2d;
+
+    const write = (x, y, str) => {
+      console.log(x, str)
+      if (text2d.isFree(x, y, x + str.length + 1, y))
+        this.addAction(new ActionBlit(text2d, { x, y }, str))
+      else {
+        const xEnd = x + str.length;
+        const xLastWEnd = text2d.getXlastCurrentWord(xEnd, y);
+
+        let xBegin = x;
+
+        while (text2d.getCharAt(xBegin, y) == " ")
+          xBegin++;
+
+
+        const A = new ActionBlit(text2d, { x, y }, str);
+        if (xBegin < xEnd) {
+          const nextstr = text2d.extractZone(xBegin, y, xLastWEnd, y);
+          this.addAction(new ActionBlit(text2d, { x: xBegin, y }, " ".repeat(xLastWEnd - xBegin)));
+          text2d.blitText(xBegin, y, " ".repeat(xLastWEnd - xBegin));
+          write(xEnd, y, nextstr);
+        }
+        this.addAction(A);
+      }
+    }
+
     for (let y = pos.y; y < pos.y + afterText2d.height; y++) {
-      const XlastWord = text2d.getXlastCurrentWord(pos.x, y);
-      const lengthInsertion = afterText2d.array[y - pos.y].length;
-      this.isShiftX[y] = (XlastWord < pos.x + lengthInsertion) ? 0 :
-        lengthInsertion;
-    }
-    this.txt = txt;
-  }
-  do() {
-    for (let y = this.pos.y; y < this.pos.y + this.afterText2d.height; y++)
-      this.text2d.shiftRight(this.pos.x, y, this.isShiftX[y]);
-    this.text2d.blitText(this.pos.x, this.pos.y, this.txt);
-  }
-  undo() {
-    for (let y = this.pos.y; y < this.pos.y + this.afterText2d.height; y++) {
-      const lengthInsertion = this.afterText2d.array[y - this.pos.y].length;
-      this.text2d.blitText(this.pos.x, y, " ".repeat(lengthInsertion));
-      this.text2d.shiftLeft(this.pos.x, y, this.isShiftX[y]);
+      const strInsert = afterText2d.array[y - pos.y].join("") + ((text2d.getCharAt(pos.x, y) == " ") ? " " : "");
+      write(pos.x, y, strInsert);
     }
   }
+
 }
 
 
