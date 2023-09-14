@@ -420,8 +420,8 @@ class TextMapEditor extends HTMLElement {
       if (!evt.shiftKey)
         selectionValidate();
       if (evt.ctrlKey) {
-        if (evt.key == "z") this.cancelStack.undo();
-        else if (evt.key == "y") this.cancelStack.redo();
+        if (!evt.shiftKey && evt.key == "z") this.cancelStack.undo();
+        else if (evt.key == "y" || (evt.shiftKey && evt.key == "Z")) this.cancelStack.redo();
         if (evt.key == "x") {
           copySelection();
           deleteSelection();
