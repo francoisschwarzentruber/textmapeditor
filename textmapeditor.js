@@ -2,7 +2,7 @@
  * colors
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
-const COLOR = "rgb(222, 222, 222)";
+const COLOR = "rgb(255, 255, 222)";
 const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
 const CELLW = 10;
 const CELLH = 20;
@@ -482,20 +482,16 @@ class TextMapEditor extends HTMLElement {
             execute(action);
           }
         }
-        else if (this.cursor.x != this.endSelection.x) {
-          deleteSelection();
-          this.endSelection.x = this.cursor.x;
-        }
         else {
-          this.cursor = this.cursor.left();
-          this.endSelection.x = this.cursor.x;
           let x = 0;
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-            x = Math.max(x, this.text2d.getXlastCurrentWord(this.cursor.x, y));
+            x = Math.max(x, this.text2d.getXlastCurrentWord(this.endSelection.x, y));
 
           const action = new ActionBlit(this.text2d, this.cursor,
-            addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, this.endSelection.y), " "));
+            addSuffixSameLetter(this.text2d.extractZone(this.endSelection.x + 1, this.cursor.y, x, this.endSelection.y), " ".repeat(this.endSelection.x + 1 - this.cursor.x)));
           execute(action);
+          this.cursor = this.cursor.left();
+          this.endSelection.x = this.cursor.x;
         }
       }
       else if (evt.key == "Escape")
@@ -564,7 +560,8 @@ class TextMapEditor extends HTMLElement {
           if (isDigit(char)) ctx.fillStyle = "pink";
           if (char == "(" || char == ")") ctx.fillStyle = "orange";
           if (char == "[" || char == "]") ctx.fillStyle = "orange";
-          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,128, 255)";
+          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,192, 255)";
+          if (char == "#" || char == "♭" || char == "♯") ctx.fillStyle = "rgb(255,255, 0)";
 
           ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
         }
