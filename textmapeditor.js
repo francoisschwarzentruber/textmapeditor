@@ -52,28 +52,26 @@ class Text2D {
    * @param {*} char 
    * @description set the character at line y column x
    */
-  setCharAt(x, y, char) {
-    if (y < this.array.length) {
-      if (x < this.array[y].length)
-        this.array[y][x] = char;
-      else {
-        for (let x1 = this.array[y].length; x1 <= x; x1++)
-          this.array[y].push(" ");
-        this.array[y][x] = char;
-      }
-    }
-    else {
+  setCharAt(x, y, char) { this._makeCellExists(x, y); this.array[y][x] = char; }
+
+
+  _makeCellExists(x, y) {
+    if (y >= this.array.length) {
       for (let y2 = this.array.length; y2 <= y; y2++) {
         this.array.push([]);
       }
-      this.setCharAt(x, y, char);
+      this._makeCellExists(x, y);
+    }
+    else {
+      for (let x1 = this.array[y].length; x1 <= x; x1++)
+        this.array[y].push(" ");
     }
   }
 
   /**
    * @return the x that ends the word at (x,y)
    */
-  lastCurrentWord(x, y) {
+  getXlastCurrentWord(x, y) {
     while (this.extractZone(x, y, x + 2, y).trim() != "") x++;
     return x;
   }
@@ -121,6 +119,15 @@ class Text2D {
   set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
   get lines() { return this.array.map((l) => l.join("").trimEnd()); }
 
+  shiftRight(xLeft, y, n) {
+    console.log(n)
+    this._makeCellExists(xLeft, y);
+    this.array[y] = [...this.array[y].slice(0, xLeft), ...Array(n).fill(" "), ...this.array[y].slice(xLeft)];
+  }
+  shiftLeft(xLeft, y, n) {
+    this._makeCellExists(xLeft, y);
+    this.array[y] = [...this.array[y].slice(0, xLeft), ...this.array[y].slice(xLeft + n)];
+  }
 
   /**
    * 
@@ -153,20 +160,54 @@ const isDigit = (char) => {
 }
 
 
-
+/**
+ * agressively put the text txt at pos (it just blits and replace what there is there)
+ */
 class ActionBlit {
-  constructor(text2d, pos, after) {
+  constructor(text2d, pos, txt) {
     this.text2d = text2d;
     this.pos = new Point(pos.x, pos.y);
-    const afterText2d = new Text2D(after);
+    const afterText2d = new Text2D(txt);
     this.before = text2d.extractZone(pos.x, pos.y,
       pos.x + afterText2d.width, pos.y + afterText2d.height);
-    this.after = after;
+    this.after = txt;
   }
   do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
   undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
 }
 
+
+/**
+ * write the txt. It shift to the right if there are some text already there
+ */
+class ActionWrite {
+  constructor(text2d, pos, txt) {
+    this.text2d = text2d;
+    this.pos = new Point(pos.x, pos.y);
+    this.isShiftX = [];
+    const afterText2d = new Text2D(txt);
+    this.afterText2d = afterText2d;
+    for (let y = pos.y; y < pos.y + afterText2d.height; y++) {
+      const XlastWord = text2d.getXlastCurrentWord(pos.x, y);
+      const lengthInsertion = afterText2d.array[y - pos.y].length;
+      this.isShiftX[y] = (XlastWord < pos.x + lengthInsertion) ? 0 :
+        lengthInsertion;
+    }
+    this.txt = txt;
+  }
+  do() {
+    for (let y = this.pos.y; y < this.pos.y + this.afterText2d.height; y++)
+      this.text2d.shiftRight(this.pos.x, y, this.isShiftX[y]);
+    this.text2d.blitText(this.pos.x, this.pos.y, this.txt);
+  }
+  undo() {
+    for (let y = this.pos.y; y < this.pos.y + this.afterText2d.height; y++) {
+      const lengthInsertion = this.afterText2d.array[y - this.pos.y].length;
+      this.text2d.blitText(this.pos.x, y, " ".repeat(lengthInsertion));
+      this.text2d.shiftLeft(this.pos.x, y, this.isShiftX[y]);
+    }
+  }
+}
 
 
 class ActionInsertLine {
@@ -263,10 +304,22 @@ class TextMapEditor extends HTMLElement {
       navigator.clipboard.writeText(this.clipBoard);
     }
 
-    this.write = (clipText) => {
+    this.blit = (clipText) => {
       selectionValidate();
       const clipText2D = new Text2D(clipText);
       const action = new ActionBlit(this.text2d, this.cursor, clipText);
+      execute(action);
+      this.cursor.x += clipText2D.width;
+      this.cursor.y += clipText2D.height - 1;
+      this.endSelection = this.cursor;
+      this.update();
+    }
+
+
+    this.write = (clipText) => {
+      selectionValidate();
+      const clipText2D = new Text2D(clipText);
+      const action = new ActionWrite(this.text2d, this.cursor, clipText);
       execute(action);
       this.cursor.x += clipText2D.width;
       this.cursor.y += clipText2D.height - 1;
@@ -402,7 +455,7 @@ class TextMapEditor extends HTMLElement {
           this.endSelection.x = this.cursor.x;
           let x = 0;
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-            x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+            x = Math.max(x, this.text2d.getXlastCurrentWord(this.cursor.x, y));
 
           const action = new ActionBlit(this.text2d, this.cursor,
             addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, this.endSelection.y), " "));
@@ -423,10 +476,10 @@ class TextMapEditor extends HTMLElement {
       else if (evt.key.length == 1) {
         let x = 0;
         for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-          x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+          x = Math.max(x, this.text2d.getXlastCurrentWord(this.cursor.x, y));
 
-        const action = new ActionBlit(this.text2d, this.cursor,
-          addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, this.endSelection.y)));
+        const action = new ActionWrite(this.text2d, this.cursor,
+          Array(this.endSelection.y - this.cursor.y + 1).fill(evt.key).join("\n"));
         execute(action);
         this.cursor.x++;
         this.endSelection = new Point(this.cursor.x, this.endSelection.y);
