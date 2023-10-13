@@ -3,11 +3,13 @@
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(255, 255, 222)";
-const SELECTIONBACKGROUND = "rgb(96, 96, 192)";
+const SELECTIONBACKGROUND = "rgb(96, 96, 164)";
 const CELLW = 10;
 const CELLH = 20;
 
-/*const BACKGROUND = "white";
+/*
+//day mode
+const BACKGROUND = "white";
 const COLOR = "black";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 */
@@ -40,8 +42,7 @@ class Text2D {
    * @returns the character at line y column x
    */
   getCharAt(x, y) {
-    if (y >= this.array.length || x >= this.array[y].length)
-      return " ";
+    if (y >= this.array.length || x >= this.array[y].length) return " ";
     return this.array[y][x];
   }
 
@@ -54,7 +55,12 @@ class Text2D {
    */
   setCharAt(x, y, char) { this._makeCellExists(x, y); this.array[y][x] = char; }
 
-
+  /**
+   * 
+   * @param {*} x 
+   * @param {*} y
+   * @description makes that the cell (x,y) physically exists (used by other methods internally) 
+   */
   _makeCellExists(x, y) {
     if (y >= this.array.length) {
       for (let y2 = this.array.length; y2 <= y; y2++) {
@@ -119,17 +125,15 @@ class Text2D {
   set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
   get lines() { return this.array.map((l) => l.join("").trimEnd()); }
 
-  shiftRight(xLeft, y, n, endY) {
-    console.log(n)
-    this._makeCellExists(xLeft, y);
-    this.array[y] = [...this.array[y].slice(0, xLeft), ...Array(n).fill(" "), ...this.array[y].slice(xLeft)];
-  }
-  shiftLeft(xLeft, y, n) {
-    this._makeCellExists(xLeft, y);
-    this.array[y] = [...this.array[y].slice(0, xLeft), ...this.array[y].slice(xLeft + n)];
-  }
 
-
+  /**
+   * 
+   * @param {*} x 
+   * @param {*} y 
+   * @param {*} x2 
+   * @param {*} y2 
+   * @returns true if the rectangular zone is empty (only " ")
+   */
   isFree(x, y, x2, y2 = y) {
     for (let iy = y; iy <= y2; iy++) {
       for (let ix = x; ix <= x2; ix++) {
@@ -189,17 +193,16 @@ class ActionBlit {
 }
 
 
-
+/**
+ * abstract action made up of several actions
+ */
 class ActionComposite {
-
-  constructor() {
-    this.actions = [];
-  }
+  constructor() { this.actions = []; }
   addAction(a) { this.actions.push(a) }
-
   do() { this.actions.map((a) => a.do()) }
   undo() { const ar = [...this.actions].reverse(); ar.map((a) => a.undo()) }
 }
+
 /**
  * write the txt. It shift to the right if there are some text already there
  */
@@ -245,24 +248,14 @@ class ActionWrite extends ActionComposite {
 
 }
 
-
 class ActionInsertLine {
-  constructor(text2d, y) {
-    this.text2d = text2d;
-    this.y = y;
-  }
+  constructor(text2d, y) { this.text2d = text2d; this.y = y; }
   do() { this.text2d.insertLine(this.y); }
   undo() { this.text2d.deleteLine(this.y); }
 }
 
-
-
 class ActionDeleteLine {
-  constructor(text2d, y) {
-    this.text2d = text2d;
-    this.y = y;
-    this.previousLine = text2d.lines[y];
-  }
+  constructor(text2d, y) { this.text2d = text2d; this.y = y; this.previousLine = text2d.lines[y]; }
   do() { this.text2d.deleteLine(this.y); }
   undo() {
     this.text2d.insertLine(this.y);
@@ -369,8 +362,6 @@ class TextMapEditor extends HTMLElement {
       const action = new ActionBlit(this.text2d, this.cursor, E);
       execute(action);
     }
-
-
 
     const evtToPoint = (evt) => new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
 
@@ -483,6 +474,10 @@ class TextMapEditor extends HTMLElement {
           }
         }
         else {
+          if (this.endSelection.x == this.cursor.x) {
+            this.cursor = this.cursor.left();
+            this.endSelection.x = this.cursor.x;
+          }
           let x = 0;
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
             x = Math.max(x, this.text2d.getXlastCurrentWord(this.endSelection.x, y));
@@ -490,7 +485,7 @@ class TextMapEditor extends HTMLElement {
           const action = new ActionBlit(this.text2d, this.cursor,
             addSuffixSameLetter(this.text2d.extractZone(this.endSelection.x + 1, this.cursor.y, x, this.endSelection.y), " ".repeat(this.endSelection.x + 1 - this.cursor.x)));
           execute(action);
-          this.cursor = this.cursor.left();
+
           this.endSelection.x = this.cursor.x;
         }
       }
