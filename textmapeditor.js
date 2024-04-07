@@ -318,6 +318,12 @@ class TextMapEditor extends HTMLElement {
     this.divSelection.style.pointerEvents = "none";
     this.divSelection.style.zIndex = 1;
 
+    let i = 0;
+    setInterval(() => {
+      this.divSelection.style.opacity = ((this.cursor.x != this.endSelection.x) || (this.cursor.y != this.endSelection.y)) ? 1 : i;
+      i = 1 - i;
+    }, 500);
+
     this.wrapper.appendChild(this.divSelection);
     shadow.appendChild(wrapper);
     wrapper.appendChild(canvas);
@@ -339,7 +345,6 @@ class TextMapEditor extends HTMLElement {
     this.isCursorVisible = true;
 
     this.update();
-    setInterval(() => { this.isCursorVisible = !this.isCursorVisible; this.update() }, 500);
 
     this.onscroll = this.update;
 
