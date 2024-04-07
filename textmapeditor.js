@@ -2,12 +2,14 @@
  * colors
  * */
 const BACKGROUND = "rgb(32, 32, 32)";
-const COLOR = "rgb(222, 222, 222)";
-const SELECTIONBACKGROUND = "rgba(96, 96, 192, 1)";
+const COLOR = "rgb(255, 255, 222)";
+const SELECTIONBACKGROUND = "rgb(96, 96, 164)";
 const CELLW = 10;
 const CELLH = 20;
 
-/*const BACKGROUND = "white";
+/*
+//day mode
+const BACKGROUND = "white";
 const COLOR = "black";
 const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
 */
@@ -40,8 +42,7 @@ class Text2D {
    * @returns the character at line y column x
    */
   getCharAt(x, y) {
-    if (y >= this.array.length || x >= this.array[y].length)
-      return " ";
+    if (y >= this.array.length || x >= this.array[y].length) return " ";
     return this.array[y][x];
   }
 
@@ -52,28 +53,31 @@ class Text2D {
    * @param {*} char 
    * @description set the character at line y column x
    */
-  setCharAt(x, y, char) {
-    if (y < this.array.length) {
-      if (x < this.array[y].length)
-        this.array[y][x] = char;
-      else {
-        for (let x1 = this.array[y].length; x1 <= x; x1++)
-          this.array[y].push(" ");
-        this.array[y][x] = char;
-      }
-    }
-    else {
+  setCharAt(x, y, char) { this._makeCellExists(x, y); this.array[y][x] = char; }
+
+  /**
+   * 
+   * @param {*} x 
+   * @param {*} y
+   * @description makes that the cell (x,y) physically exists (used by other methods internally) 
+   */
+  _makeCellExists(x, y) {
+    if (y >= this.array.length) {
       for (let y2 = this.array.length; y2 <= y; y2++) {
         this.array.push([]);
       }
-      this.setCharAt(x, y, char);
+      this._makeCellExists(x, y);
+    }
+    else {
+      for (let x1 = this.array[y].length; x1 <= x; x1++)
+        this.array[y].push(" ");
     }
   }
 
   /**
    * @return the x that ends the word at (x,y)
    */
-  lastCurrentWord(x, y) {
+  getXlastCurrentWord(x, y) {
     while (this.extractZone(x, y, x + 2, y).trim() != "") x++;
     return x;
   }
@@ -124,6 +128,25 @@ class Text2D {
 
   /**
    * 
+   * @param {*} x 
+   * @param {*} y 
+   * @param {*} x2 
+   * @param {*} y2 
+   * @returns true if the rectangular zone is empty (only " ")
+   */
+  isFree(x, y, x2, y2 = y) {
+    for (let iy = y; iy <= y2; iy++) {
+      for (let ix = x; ix <= x2; ix++) {
+        this._makeCellExists(ix, iy);
+        if (this.array[iy][ix] != " ")
+          return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * 
    * @param {*} y
    * @description insert a line at y 
    */
@@ -153,39 +176,85 @@ const isDigit = (char) => {
 }
 
 
-
+/**
+ * agressively put the text txt at pos (it just blits and replace what there is there)
+ */
 class ActionBlit {
-  constructor(text2d, pos, after) {
+  constructor(text2d, pos, txt) {
     this.text2d = text2d;
     this.pos = new Point(pos.x, pos.y);
-    const afterText2d = new Text2D(after);
+    const afterText2d = new Text2D(txt);
     this.before = text2d.extractZone(pos.x, pos.y,
       pos.x + afterText2d.width, pos.y + afterText2d.height);
-    this.after = after;
+    this.after = txt;
   }
   do() { this.text2d.blitText(this.pos.x, this.pos.y, this.after); }
   undo() { this.text2d.blitText(this.pos.x, this.pos.y, this.before); }
 }
 
 
+/**
+ * abstract action made up of several actions
+ */
+class ActionComposite {
+  constructor() { this.actions = []; }
+  addAction(a) { this.actions.push(a) }
+  do() { this.actions.map((a) => a.do()) }
+  undo() { const ar = [...this.actions].reverse(); ar.map((a) => a.undo()) }
+}
+
+/**
+ * write the txt. It shift to the right if there are some text already there
+ */
+class ActionWrite extends ActionComposite {
+  constructor(text2d, pos, txt) {
+    super();
+    this.text2d = text2d;
+    this.pos = new Point(pos.x, pos.y);
+
+    const afterText2d = new Text2D(txt);
+    this.afterText2d = afterText2d;
+
+    const write = (x, y, str) => {
+      if (text2d.isFree(x, y, x + str.length + 1, y))
+        this.addAction(new ActionBlit(text2d, { x, y }, str))
+      else {
+        const xEnd = x + str.length;
+        const xLastWEnd = text2d.getXlastCurrentWord(xEnd, y);
+
+        let xBegin = x;
+
+        while (text2d.getCharAt(xBegin, y) == " ")
+          xBegin++;
+
+
+        const A = new ActionBlit(text2d, { x, y }, str);
+        if (xBegin < xEnd) {
+          const nextstr = text2d.extractZone(xBegin, y, xLastWEnd, y);
+          this.addAction(new ActionBlit(text2d, { x: xBegin, y }, " ".repeat(xLastWEnd - xBegin)));
+          text2d.blitText(xBegin, y, " ".repeat(xLastWEnd - xBegin));
+          write(xEnd, y, nextstr);
+        }
+        this.addAction(A);
+      }
+    }
+
+    for (let y = pos.y; y < pos.y + afterText2d.height; y++) {
+      const strInsert = afterText2d.array[y - pos.y].join("") + ((text2d.getCharAt(pos.x, y) == " ") ? " " : "");
+      write(pos.x, y, strInsert);
+    }
+  }
+
+}
 
 class ActionInsertLine {
-  constructor(text2d, y) {
-    this.text2d = text2d;
-    this.y = y;
-  }
+  constructor(text2d, y) { this.text2d = text2d; this.y = y; }
   do() { this.text2d.insertLine(this.y); }
   undo() { this.text2d.deleteLine(this.y); }
 }
 
-
-
 class ActionDeleteLine {
-  constructor(text2d, y) {
-    this.text2d = text2d;
-    this.y = y;
-    this.previousLine = text2d.lines[y];
-  }
+  constructor(text2d, y) { this.text2d = text2d; this.y = y; this.previousLine = text2d.lines[y]; }
   do() { this.text2d.deleteLine(this.y); }
   undo() {
     this.text2d.insertLine(this.y);
@@ -220,18 +289,29 @@ class TextMapEditor extends HTMLElement {
 
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
+    const wrapper = document.createElement("div");
+    wrapper.style.overflow = "scroll";
+    wrapper.style.position = "absolute";
+    wrapper.style.background = BACKGROUND;
+    wrapper.style.width = "100%";
+    wrapper.style.height = "100%";
+    this.wrapper = wrapper;
+    const canvas = document.createElement("canvas");
 
-    this.style.overflow = "scroll";
+    this.canvas = canvas;
+    canvas.width = 12080;
+    canvas.height = 620;
+    canvas.style.zIndex = 100;
+    canvas.style.position = "absolute";
 
-    this.wrapper = document.createElement("div");
-    this.wrapper.style.position = "relative";
-    this.wrapper.style.backgroundColor = BACKGROUND;
-    this.wrapper.style.width = "fit-content";
-    this.wrapper.style.height = "fit-content";
-this.wrapper.style.overflow ="visible";
+    const textareaForClipBoard = document.createElement("textarea"); // a hack for having copy-paste without the browser asking questions
+    textareaForClipBoard.style.height = "0px";
+    textareaForClipBoard.style.width = "0px";
+    textareaForClipBoard.style.top = "-100px";
+    // textareaForClipBoard.style.position = "absolute";
+    this.textareaForClipBoard = textareaForClipBoard;
 
 
-    shadow.appendChild(this.wrapper);
     this.divSelection = document.createElement("div");
     this.divSelection.style.position = "absolute";
     this.divSelection.style.backgroundColor = SELECTIONBACKGROUND;
@@ -239,16 +319,9 @@ this.wrapper.style.overflow ="visible";
     this.divSelection.style.zIndex = 1;
 
     this.wrapper.appendChild(this.divSelection);
-
-    const canvas = document.createElement("canvas");
-    this.canvas = canvas;
-    this.canvas.style.zIndex = 2;
-    this.canvas.style.position = "absolute";
-
-    canvas.width = 12080;
-    canvas.height = 420;
-    canvas.style.backgroundColor = "rgba(0, 0, 0, 0)"
-    this.wrapper.appendChild(canvas);
+    shadow.appendChild(wrapper);
+    wrapper.appendChild(canvas);
+    shadow.appendChild(textareaForClipBoard);
 
     this.text2d = new Text2D("");
     this.clipBoard = "";
@@ -285,10 +358,22 @@ this.wrapper.style.overflow ="visible";
       navigator.clipboard.writeText(this.clipBoard);
     }
 
-    this.write = (clipText) => {
+    this.blit = (clipText) => {
       selectionValidate();
       const clipText2D = new Text2D(clipText);
       const action = new ActionBlit(this.text2d, this.cursor, clipText);
+      execute(action);
+      this.cursor.x += clipText2D.width;
+      this.cursor.y += clipText2D.height - 1;
+      this.endSelection = this.cursor;
+      this.update();
+    }
+
+
+    this.write = (clipText) => {
+      selectionValidate();
+      const clipText2D = new Text2D(clipText);
+      const action = new ActionWrite(this.text2d, this.cursor, clipText);
       execute(action);
       this.cursor.x += clipText2D.width;
       this.cursor.y += clipText2D.height - 1;
@@ -302,8 +387,6 @@ this.wrapper.style.overflow ="visible";
       const action = new ActionBlit(this.text2d, this.cursor, E);
       execute(action);
     }
-
-
 
     const evtToPoint = (evt) => new Point(Math.floor(evt.offsetX / CELLW), Math.floor(evt.offsetY / CELLH));
 
@@ -326,8 +409,15 @@ this.wrapper.style.overflow ="visible";
 
     canvas.onmousemove = (evt) => {
       cursorMouse = evtToPoint(evt);
-      if (this.dAndDTopLeft) this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
-      else if (evt.buttons) this.endSelection = cursorMouse;
+      if (this.dAndDTopLeft)
+        this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
+      else if (evt.buttons) {
+        this.endSelection = cursorMouse;
+
+        this.makePositionVisible({ x: cursorMouse.x + 1, y: cursorMouse.y })
+        this.makePositionVisible({ x: cursorMouse.x - 1, y: cursorMouse.y })
+
+      }
 
       requestAnimationFrame(() => this.update());
     }
@@ -353,15 +443,20 @@ this.wrapper.style.overflow ="visible";
       if (!evt.shiftKey)
         selectionValidate();
       if (evt.ctrlKey) {
-        if (evt.key == "z") this.cancelStack.undo();
-        else if (evt.key == "y") this.cancelStack.redo();
+        if (!evt.shiftKey && evt.key == "z") this.cancelStack.undo();
+        else if (evt.key == "y" || (evt.shiftKey && evt.key == "Z")) this.cancelStack.redo();
         if (evt.key == "x") {
           copySelection();
           deleteSelection();
         }
         else if (evt.key == "c")
           copySelection();
-        else if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
+        else if (evt.key == "v") {
+          setTimeout(() => {
+            this.write(this.textareaForClipBoard.value);
+          }, 100);
+
+        }//navigator.clipboard.readText().then((t) => this.write(t));
         else if (evt.key == "a") {
           this.cursor = new Point(0, 0);
           this.endSelection = new Point(this.text2d.width, this.text2d.height);
@@ -415,20 +510,20 @@ this.wrapper.style.overflow ="visible";
             execute(action);
           }
         }
-        else if (this.cursor.x != this.endSelection.x) {
-          deleteSelection();
-          this.endSelection.x = this.cursor.x;
-        }
         else {
-          this.cursor = this.cursor.left();
-          this.endSelection.x = this.cursor.x;
+          if (this.endSelection.x == this.cursor.x) {
+            this.cursor = this.cursor.left();
+            this.endSelection.x = this.cursor.x;
+          }
           let x = 0;
           for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-            x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+            x = Math.max(x, this.text2d.getXlastCurrentWord(this.endSelection.x, y));
 
           const action = new ActionBlit(this.text2d, this.cursor,
-            addSuffixSameLetter(this.text2d.extractZone(this.cursor.x + 1, this.cursor.y, x, this.endSelection.y), " "));
+            addSuffixSameLetter(this.text2d.extractZone(this.endSelection.x + 1, this.cursor.y, x, this.endSelection.y), " ".repeat(this.endSelection.x + 1 - this.cursor.x)));
           execute(action);
+
+          this.endSelection.x = this.cursor.x;
         }
       }
       else if (evt.key == "Escape")
@@ -445,17 +540,23 @@ this.wrapper.style.overflow ="visible";
       else if (evt.key.length == 1) {
         let x = 0;
         for (let y = this.cursor.y; y <= this.endSelection.y; y++)
-          x = Math.max(x, this.text2d.lastCurrentWord(this.cursor.x, y));
+          x = Math.max(x, this.text2d.getXlastCurrentWord(this.cursor.x, y));
 
-        const action = new ActionBlit(this.text2d, this.cursor,
-          addPrefixSameLetter(evt.key, this.text2d.extractZone(this.cursor.x, this.cursor.y, x, this.endSelection.y)));
+        const action = new ActionWrite(this.text2d, this.cursor,
+          Array(this.endSelection.y - this.cursor.y + 1).fill(evt.key).join("\n"));
         execute(action);
         this.cursor.x++;
         this.endSelection = new Point(this.cursor.x, this.endSelection.y);
         evt.preventDefault();
       }
       this.update();
+
+      this.makePositionVisible(this.endSelection);
+      this.textareaForClipBoard.value = "";
     }
+
+
+
   }
 
 
@@ -473,6 +574,15 @@ this.wrapper.style.overflow ="visible";
   }
 
 
+  get visibleZone() {
+    return {
+      x: Math.floor(this.wrapper.scrollLeft / CELLW),
+      y: Math.floor(this.wrapper.scrollTop / CELLH),
+      w: Math.floor(this.wrapper.clientWidth / CELLW),
+      h: Math.floor(this.wrapper.clientHeight / CELLH)
+    };
+  }
+
   updateSelection() {
     this.divSelection.style.left = CELLW * Math.min(this.cursor.x, this.endSelection.x) + "px";
     this.divSelection.style.top = CELLH * Math.min(this.cursor.y, this.endSelection.y) + "px";
@@ -480,32 +590,23 @@ this.wrapper.style.overflow ="visible";
     this.divSelection.style.height = CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1) + "px";
   }
 
-
   update() {
     this.updateSelection();
-    const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
+    const visibleZone = this.visibleZone;
     const canvas = this.canvas;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    /*  if ((this.isCursorVisible || this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
-        ctx.fillStyle = SELECTIONBACKGROUND;
-        ctx.fillRect(CELLW * Math.min(this.cursor.x, this.endSelection.x),
-          CELLH * Math.min(this.cursor.y, this.endSelection.y),
-          CELLW * (Math.abs(this.endSelection.x - this.cursor.x) + 1),
-          CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
-      }*/
 
-    const R = this.getBoundingClientRect();
-
-    for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
-      for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
+    for (let y = visibleZone.y; y <= visibleZone.y + visibleZone.h; y++)
+      for (let x = visibleZone.x; x <= visibleZone.x + visibleZone.w; x++) {
         const char = this.text2d.getCharAt(x, y);
         if (char != " ") {
           ctx.fillStyle = COLOR;
           if (isDigit(char)) ctx.fillStyle = "pink";
           if (char == "(" || char == ")") ctx.fillStyle = "orange";
           if (char == "[" || char == "]") ctx.fillStyle = "orange";
-          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,128, 255)";
+          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,192, 255)";
+          if (char == "#" || char == "♭" || char == "♯") ctx.fillStyle = "rgb(255,255, 0)";
 
           ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
         }
@@ -534,6 +635,26 @@ this.wrapper.style.overflow ="visible";
     drawV(Math.max(this.cursor.x, this.endSelection.x) + 1);
 
     this.onchange();
+
+    this.textareaForClipBoard.value = "";
+    this.textareaForClipBoard.focus({
+      preventScroll: true
+    });
+  }
+
+  makePositionVisible(position) {
+    console.log(position)
+    const visibleZone = this.visibleZone;
+
+    if (position.x < visibleZone.x)
+      this.wrapper.scrollLeft = position.x * CELLW;
+    else if (position.x >= visibleZone.x + visibleZone.w - 1)
+      this.wrapper.scrollLeft = (position.x + 1 - visibleZone.w) * CELLW;
+
+    if (position.y <= visibleZone.y + 1)
+      this.wrapper.scrollTop = (position.y - 1) * CELLH;
+    else if (position.y >= visibleZone.y + visibleZone.h - 2)
+      this.wrapper.scrollTop = (position.y + 2 - visibleZone.h) * CELLH;
   }
 
   get lines() { return this.text2d.lines; }
@@ -541,5 +662,9 @@ this.wrapper.style.overflow ="visible";
   set text(txt) { this.text2d.text = txt; this.resizeCanvas(); this.update(); }
   onchange = () => { };
 }
+
+
+
+
 
 customElements.define("text-map-editor", TextMapEditor);
