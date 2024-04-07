@@ -216,7 +216,6 @@ class ActionWrite extends ActionComposite {
     this.afterText2d = afterText2d;
 
     const write = (x, y, str) => {
-      console.log(x, str)
       if (text2d.isFree(x, y, x + str.length + 1, y))
         this.addAction(new ActionBlit(text2d, { x, y }, str))
       else {
@@ -300,7 +299,7 @@ class TextMapEditor extends HTMLElement {
 
     this.canvas = canvas;
     canvas.width = 12080;
-    canvas.height = 420;
+    canvas.height = 620;
 
     const textareaForClipBoard = document.createElement("textarea"); // a hack for having copy-paste without the browser asking questions
     textareaForClipBoard.style.height = "0px";
@@ -399,8 +398,15 @@ class TextMapEditor extends HTMLElement {
 
     canvas.onmousemove = (evt) => {
       cursorMouse = evtToPoint(evt);
-      if (this.dAndDTopLeft) this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
-      else if (evt.buttons) this.endSelection = cursorMouse;
+      if (this.dAndDTopLeft)
+        this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
+      else if (evt.buttons) {
+        this.endSelection = cursorMouse;
+
+        this.makePositionVisible({ x: cursorMouse.x + 1, y: cursorMouse.y })
+        this.makePositionVisible({ x: cursorMouse.x - 1, y: cursorMouse.y })
+
+      }
 
       requestAnimationFrame(() => this.update());
     }
@@ -533,8 +539,13 @@ class TextMapEditor extends HTMLElement {
         evt.preventDefault();
       }
       this.update();
+
+      this.makePositionVisible(this.endSelection);
+      this.textareaForClipBoard.value = "";
     }
-    this.textareaForClipBoard.value = "";
+
+
+
   }
 
 
@@ -551,8 +562,20 @@ class TextMapEditor extends HTMLElement {
     ctx.font = "14px Monospace";
   }
 
+
+  get visibleZone() {
+    return {
+      x: Math.floor(this.wrapper.scrollLeft / CELLW),
+      y: Math.floor(this.wrapper.scrollTop / CELLH),
+      w: Math.floor(this.wrapper.clientWidth / CELLW),
+      h: Math.floor(this.wrapper.clientHeight / CELLH)
+    };
+  }
+
+
+
   update() {
-    const topLeft = new Point(Math.floor(this.wrapper.scrollLeft / CELLW), Math.floor(this.wrapper.scrollTop / CELLH));
+    const visibleZone = this.visibleZone;
     const canvas = this.canvas;
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = BACKGROUND;
@@ -566,10 +589,9 @@ class TextMapEditor extends HTMLElement {
         CELLH * (Math.abs(this.endSelection.y - this.cursor.y) + 1));
     }
 
-    const R = this.getBoundingClientRect();
 
-    for (let y = topLeft.y; y < topLeft.y + R.height / CELLH; y++)
-      for (let x = topLeft.x; x < topLeft.x + R.width / CELLW; x++) {
+    for (let y = visibleZone.y; y <= visibleZone.y + visibleZone.h; y++)
+      for (let x = visibleZone.x; x <= visibleZone.x + visibleZone.w; x++) {
         const char = this.text2d.getCharAt(x, y);
         if (char != " ") {
           ctx.fillStyle = COLOR;
@@ -613,10 +635,29 @@ class TextMapEditor extends HTMLElement {
     });
   }
 
+  makePositionVisible(position) {
+    console.log(position)
+    const visibleZone = this.visibleZone;
+
+    if (position.x < visibleZone.x)
+      this.wrapper.scrollLeft = position.x * CELLW;
+    else if (position.x >= visibleZone.x + visibleZone.w - 1)
+      this.wrapper.scrollLeft = (position.x + 1 - visibleZone.w) * CELLW;
+
+    if (position.y <= visibleZone.y + 1)
+      this.wrapper.scrollTop = (position.y - 1) * CELLH;
+    else if (position.y >= visibleZone.y + visibleZone.h - 2)
+      this.wrapper.scrollTop = (position.y + 2 - visibleZone.h) * CELLH;
+  }
+
   get lines() { return this.text2d.lines; }
   get text() { return this.text2d.text; }
   set text(txt) { this.text2d.text = txt; this.resizeCanvas(); this.update(); }
   onchange = () => { };
 }
+
+
+
+
 
 customElements.define("text-map-editor", TextMapEditor);
