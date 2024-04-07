@@ -290,13 +290,28 @@ class TextMapEditor extends HTMLElement {
 
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
+    const wrapper = document.createElement("div");
+    wrapper.style.overflow = "scroll";
+    wrapper.style.position = "absolute";
+    wrapper.style.width = "100%";
+    wrapper.style.height = "100%";
+    this.wrapper = wrapper;
     const canvas = document.createElement("canvas");
+
     this.canvas = canvas;
     canvas.width = 12080;
     canvas.height = 420;
 
-    this.style.overflow = "scroll";
-    shadow.appendChild(canvas);
+    const textareaForClipBoard = document.createElement("textarea"); // a hack for having copy-paste without the browser asking questions
+    textareaForClipBoard.style.height = "0px";
+    textareaForClipBoard.style.width = "0px";
+    textareaForClipBoard.style.top = "-100px";
+    // textareaForClipBoard.style.position = "absolute";
+    this.textareaForClipBoard = textareaForClipBoard;
+
+    shadow.appendChild(wrapper);
+    wrapper.appendChild(canvas);
+    shadow.appendChild(textareaForClipBoard);
 
     this.text2d = new Text2D("");
     this.clipBoard = "";
@@ -419,7 +434,12 @@ class TextMapEditor extends HTMLElement {
         }
         else if (evt.key == "c")
           copySelection();
-        else if (evt.key == "v") navigator.clipboard.readText().then((t) => this.write(t));
+        else if (evt.key == "v") {
+          setTimeout(() => {
+            this.write(this.textareaForClipBoard.value);
+          }, 100);
+
+        }//navigator.clipboard.readText().then((t) => this.write(t));
         else if (evt.key == "a") {
           this.cursor = new Point(0, 0);
           this.endSelection = new Point(this.text2d.width, this.text2d.height);
@@ -514,6 +534,7 @@ class TextMapEditor extends HTMLElement {
       }
       this.update();
     }
+    this.textareaForClipBoard.value = "";
   }
 
 
@@ -531,7 +552,7 @@ class TextMapEditor extends HTMLElement {
   }
 
   update() {
-    const topLeft = new Point(Math.floor(this.scrollLeft / CELLW), Math.floor(this.scrollTop / CELLH));
+    const topLeft = new Point(Math.floor(this.wrapper.scrollLeft / CELLW), Math.floor(this.wrapper.scrollTop / CELLH));
     const canvas = this.canvas;
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = BACKGROUND;
@@ -585,6 +606,11 @@ class TextMapEditor extends HTMLElement {
     drawV(Math.max(this.cursor.x, this.endSelection.x) + 1);
 
     this.onchange();
+
+    this.textareaForClipBoard.value = "";
+    this.textareaForClipBoard.focus({
+      preventScroll: true
+    });
   }
 
   get lines() { return this.text2d.lines; }
