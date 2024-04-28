@@ -1,18 +1,25 @@
 /**
  * colors
  * */
+/*
 const BACKGROUND = "rgb(32, 32, 32)";
 const COLOR = "rgb(255, 255, 222)";
 const SELECTIONBACKGROUND = "rgb(96, 96, 164)";
+*/
 const CELLW = 10;
 const CELLH = 20;
 
-/*
+
 //day mode
 const BACKGROUND = "white";
 const COLOR = "black";
-const SELECTIONBACKGROUND = "rgb(96, 111, 222)";
-*/
+const SELECTIONBACKGROUND = "rgba(96, 111, 222, 0.5)";
+const BRACKETCOLOR = "orange";
+const COMMACOLOR = "rgb(0,0, 192)";
+const DIGITCOLOR = "purple";
+const SPECIALSYMBOLCOLOR = "rgb(0, 128, 0)";
+
+
 function between(v, a, b) { return (a <= v && v <= b) || (b <= v && v <= a); }
 
 /**
@@ -607,11 +614,11 @@ class TextMapEditor extends HTMLElement {
         const char = this.text2d.getCharAt(x, y);
         if (char != " ") {
           ctx.fillStyle = COLOR;
-          if (isDigit(char)) ctx.fillStyle = "pink";
-          if (char == "(" || char == ")") ctx.fillStyle = "orange";
-          if (char == "[" || char == "]") ctx.fillStyle = "orange";
-          if (char == "," || char == "'") ctx.fillStyle = "rgb(128,192, 255)";
-          if (char == "#" || char == "♭" || char == "♯") ctx.fillStyle = "rgb(255,255, 0)";
+          if (isDigit(char)) ctx.fillStyle = DIGITCOLOR;
+          if (char == "(" || char == ")") ctx.fillStyle = BRACKETCOLOR;
+          if (char == "[" || char == "]") ctx.fillStyle = BRACKETCOLOR;
+          if (char == "," || char == "'") ctx.fillStyle = COMMACOLOR;
+          if (char == "#" || char == "♭" || char == "♯") ctx.fillStyle = SPECIALSYMBOLCOLOR;
 
           ctx.fillText(char, CELLW / 2 + x * CELLW, CELLH / 2 + y * CELLH);
         }
