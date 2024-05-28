@@ -296,6 +296,7 @@ class TextMapEditor extends HTMLElement {
 
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
+
     const wrapper = document.createElement("div");
     wrapper.style.overflow = "scroll";
     wrapper.style.position = "absolute";
@@ -304,6 +305,8 @@ class TextMapEditor extends HTMLElement {
     wrapper.style.height = "100%";
     this.wrapper = wrapper;
     const canvas = document.createElement("canvas");
+    canvas.style.cursor = "text";
+
 
     this.canvas = canvas;
     canvas.width = 12080;
@@ -424,6 +427,7 @@ class TextMapEditor extends HTMLElement {
       if (this.dAndDTopLeft)
         this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
       else if (evt.buttons) {
+        this.divSelection.style.opacity = 1.0;
         this.endSelection = cursorMouse;
 
         this.makePositionVisible({ x: cursorMouse.x + 1, y: cursorMouse.y })
@@ -450,6 +454,8 @@ class TextMapEditor extends HTMLElement {
 
     canvas.tabIndex = 1000;
     this.onkeydown = (evt) => {
+      this.divSelection.style.opacity = 1.0;
+
       this.resizeCanvas();
 
       if (!evt.shiftKey)
@@ -655,7 +661,6 @@ class TextMapEditor extends HTMLElement {
   }
 
   makePositionVisible(position) {
-    console.log(position)
     const visibleZone = this.visibleZone;
 
     if (position.x < visibleZone.x)
