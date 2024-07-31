@@ -143,9 +143,9 @@ class Text2D {
     }
   }
 
-/**
- * @returns the string
- */
+  /**
+   * @returns the string
+   */
   get text() { return this.lines.join("\n"); }
   set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
 
@@ -354,17 +354,36 @@ class TextMapEditor extends HTMLElement {
   constructor() { super(); }
 
 
-/**
- * 
- * @param {*} point 
- * @returns true if the point is in the bound of the selected area
- */
+  /**
+   * 
+   * @param {*} point 
+   * @returns true if the point is in the bound of the selected area
+   */
   isCursorInSelection(point) {
     return (between(point.x, this.cursor.x, this.endSelection.x) && between(point.y, this.cursor.y, this.endSelection.y)
       && (this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y));
   }
 
 
+  setCursorBlinkingVisible() {
+    this.divSelection.style.opacity = 1.0;
+    this.cursorBlinkingState = 1;
+    this._cursorBlinkingReset();
+  }
+
+  cursorBlinkingState = 1;
+  cursorBlinkingTimer = undefined;
+
+  _cursorBlinkingReset() {
+    if (this.cursorBlinkingTimer != undefined)
+      clearInterval(this.cursorBlinkingTimer);
+
+    this.cursorBlinkingTimer = setInterval(() => {
+      this.divSelection.style.opacity = ((this.cursor.x != this.endSelection.x) || (this.cursor.y != this.endSelection.y)) ? 1 : this.cursorBlinkingState;
+      this.cursorBlinkingState = 1 - this.cursorBlinkingState;
+    }, 500);
+
+  }
 
 
   /**
@@ -400,15 +419,15 @@ class TextMapEditor extends HTMLElement {
     this.divSelection = document.createElement("div");
     this.divSelection.style.position = "absolute";
     this.divSelection.style.backgroundColor = SELECTIONBACKGROUND;
-    this.divSelection.style.borderLeft = "2px solid black";
+    this.divSelection.style.borderLeft = "1px solid black";
     this.divSelection.style.pointerEvents = "none";
     this.divSelection.style.zIndex = 1;
 
-    let i = 0;
-    setInterval(() => {
-      this.divSelection.style.opacity = ((this.cursor.x != this.endSelection.x) || (this.cursor.y != this.endSelection.y)) ? 1 : i;
-      i = 1 - i;
-    }, 500);
+
+
+
+    this._cursorBlinkingReset();
+
 
     this.wrapper.appendChild(this.divSelection);
     shadow.appendChild(wrapper);
@@ -493,16 +512,20 @@ class TextMapEditor extends HTMLElement {
       else {
         this.cursor = cursorMouse;
         this.endSelection = cursorMouse;
+        this.setCursorBlinkingVisible();
       }
       requestAnimationFrame(() => this.update());
     }
+
+
+
 
     canvas.onmousemove = (evt) => {
       cursorMouse = evtToPoint(evt);
       if (this.dAndDTopLeft)
         this.dAndDTopLeft = new Point(cursorMouse.x - this.dAndDShift.x, cursorMouse.y - this.dAndDShift.y);
       else if (evt.buttons) {
-        this.divSelection.style.opacity = 1.0;
+        this.setCursorBlinkingVisible();
         this.endSelection = cursorMouse;
 
         this.makePositionVisible({ x: cursorMouse.x + 1, y: cursorMouse.y })
@@ -531,7 +554,8 @@ class TextMapEditor extends HTMLElement {
 
     canvas.tabIndex = 1000;
     this.onkeydown = (evt) => {
-      this.divSelection.style.opacity = 1.0;
+      this.setCursorBlinkingVisible();
+
 
       this.resizeCanvas();
 
