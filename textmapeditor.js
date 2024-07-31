@@ -27,13 +27,22 @@ function between(v, a, b) { return (a <= v && v <= b) || (b <= v && v <= a); }
  */
 class Point {
   constructor(x, y) { this.x = x; this.y = y; }
-  left() { return new Point(Math.max(0, this.x - 1), this.y); } // returns a new point
+
+  /**
+   * @returns a new point corresponding to a move to the left (then resp. up, right, down)
+   */
+  left() { return new Point(Math.max(0, this.x - 1), this.y); }
   up() { return new Point(this.x, Math.max(0, this.y - 1)); }
   right() { return new Point(this.x + 1, this.y); }
   down() { return new Point(this.x, this.y + 1); }
 }
 
-function addPrefixSameLetter(letter, zone) { return zone.split("\n").map((line) => letter + line).join("\n"); }
+/**
+ * 
+ * @param {*} zone a string (generally multi-line) 
+ * @param {*} letter a symbol character
+ * @returns a copy of zone in which we have added letter at the end of each line of zone
+ */
 function addSuffixSameLetter(zone, letter) { return zone.split("\n").map((line) => line + letter).join("\n"); }
 
 /**
@@ -89,7 +98,14 @@ class Text2D {
     return x;
   }
 
+  /**
+   * the number of lines
+   */
   get height() { return Math.max(this.array.length); }
+
+  /**
+   * the max length of a line
+   */
   get width() { return Math.max(Math.max(...this.array.map(l => l.length))) }
 
   /**
@@ -127,9 +143,15 @@ class Text2D {
     }
   }
 
-
+/**
+ * @returns the string
+ */
   get text() { return this.lines.join("\n"); }
   set text(txt) { this.array = txt.split("\n").map((line) => [...line]); }
+
+  /**
+   * @returns an array containing the lines
+   */
   get lines() { return this.array.map((l) => l.join("").trimEnd()); }
 
 
@@ -158,7 +180,19 @@ class Text2D {
    * @description insert a line at y 
    */
   insertLine(y) { this.array = [...this.array.slice(0, y), [], ...this.array.slice(y)]; }
+
+  /**
+   * 
+   * @param {*} y
+   * @description removes line indexed by y (lines at y+1 becomes line at y, etc.) 
+   */
   deleteLine(y) { this.array = [...this.array.slice(0, y), ...this.array.slice(y + 1)]; }
+
+  /**
+   * 
+   * @param {*} y 
+   * @returns true iff the line at y is empty (only contains " ")
+   */
   isLineEmpty(y) { if (y >= this.array.length) return true; else return this.array[y].every((cell) => (cell == " ")); }
 }
 
@@ -176,6 +210,11 @@ function stringEmptyRectangle(w, h) {
   return A.join("\n");
 }
 
+/**
+ * 
+ * @param {*} char 
+ * @returns true if char is in ["0", ..., "9"]
+ */
 const isDigit = (char) => {
   if (char == undefined) return false;
   const code = char.codePointAt(0);
@@ -254,12 +293,19 @@ class ActionWrite extends ActionComposite {
 
 }
 
+/**
+ * @description action that inserts a new line at y
+ */
 class ActionInsertLine {
   constructor(text2d, y) { this.text2d = text2d; this.y = y; }
   do() { this.text2d.insertLine(this.y); }
   undo() { this.text2d.deleteLine(this.y); }
 }
 
+
+/**
+ * action that deletes the line at y
+ */
 class ActionDeleteLine {
   constructor(text2d, y) { this.text2d = text2d; this.y = y; this.previousLine = text2d.lines[y]; }
   do() { this.text2d.deleteLine(this.y); }
@@ -273,27 +319,57 @@ class ActionDeleteLine {
 class CancelStack {
   constructor() { this.stack = new Array(); this.i = -1; }
 
+  /**
+   * undo the previous action
+   */
   undo() { if (this.i >= 0) { this.stack[this.i].undo(); this.i--; } }
 
+  /**
+   * redo the next action
+   */
   redo() {
     if (this.stack.length > 0) {
       if (this.i < this.stack.length - 1) { this.i++; this.stack[this.i].do(); }
     }
   }
 
-  push(a) {
+  /**
+   * 
+   * @param {*} action
+   * @description push the action into the cancel stack 
+   */
+  push(action) {
     this.stack = this.stack.slice(0, this.i + 1);
-    this.stack.push(a);
-    a.do();
+    this.stack.push(action);
+    action.do();
     this.i++;
   }
 }
 
 
-
+/**
+ * the HTML element for the text map editor
+ */
 class TextMapEditor extends HTMLElement {
   constructor() { super(); }
 
+
+/**
+ * 
+ * @param {*} point 
+ * @returns true if the point is in the bound of the selected area
+ */
+  isCursorInSelection(point) {
+    return (between(point.x, this.cursor.x, this.endSelection.x) && between(point.y, this.cursor.y, this.endSelection.y)
+      && (this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y));
+  }
+
+
+
+
+  /**
+   * @description creation of the text area
+   */
   connectedCallback() {
     const shadow = this.attachShadow({ mode: "open" });
 
@@ -306,7 +382,6 @@ class TextMapEditor extends HTMLElement {
     this.wrapper = wrapper;
     const canvas = document.createElement("canvas");
     canvas.style.cursor = "text";
-
 
     this.canvas = canvas;
     canvas.width = 12080;
@@ -411,8 +486,7 @@ class TextMapEditor extends HTMLElement {
       const p = evtToPoint(evt);
       selectionValidate();
 
-      if (between(p.x, this.cursor.x, this.endSelection.x) && between(p.y, this.cursor.y, this.endSelection.y)
-        && (this.cursor.x != this.endSelection.x || this.cursor.y != this.endSelection.y)) {
+      if (this.isCursorInSelection(p)) {
         this.dAndDShift = new Point(p.x - this.cursor.x, p.y - this.cursor.y);
         this.dAndDTopLeft = this.cursor;
       }
@@ -435,6 +509,8 @@ class TextMapEditor extends HTMLElement {
         this.makePositionVisible({ x: cursorMouse.x - 1, y: cursorMouse.y })
 
       }
+      else
+        canvas.style.cursor = this.isCursorInSelection(cursorMouse) ? "grab" : "text";
 
       requestAnimationFrame(() => this.update());
     }
