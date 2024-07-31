@@ -13,7 +13,7 @@ const CELLH = 20;
 //day mode
 const BACKGROUND = "white";
 const COLOR = "black";
-const SELECTIONBACKGROUND = "rgba(96, 111, 222, 0.5)";
+const SELECTIONBACKGROUND = "rgba(96, 111, 222, 0.3)";
 const BRACKETCOLOR = "orange";
 const COMMACOLOR = "rgb(0,0, 192)";
 const DIGITCOLOR = "purple";
@@ -325,6 +325,7 @@ class TextMapEditor extends HTMLElement {
     this.divSelection = document.createElement("div");
     this.divSelection.style.position = "absolute";
     this.divSelection.style.backgroundColor = SELECTIONBACKGROUND;
+    this.divSelection.style.borderLeft = "2px solid black";
     this.divSelection.style.pointerEvents = "none";
     this.divSelection.style.zIndex = 1;
 
