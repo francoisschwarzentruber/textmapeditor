@@ -7,7 +7,7 @@ This text editor is an HTML Web component dedicated for editing texts like **asc
 ## Features
 
 - HTML Web component
-- Less than 15kB
+- Light
 - Implemented with canvas
 - Drag drop
 - Rectangular selection
